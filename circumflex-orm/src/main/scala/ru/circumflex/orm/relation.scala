@@ -334,22 +334,22 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    */
   def insert_!(record: R, fields: Field[_]*): Int = if (readOnly_?)
     throw new ORMException("The relation " + qualifiedName + " is read-only.")
-  else transactionManager.dml(conn => {
-      val fs: Seq[Field[_]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
-      val sql = dialect.insertRecord(this, fs)
-      sqlLog.debug(sql)
-      auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
-        setParams(record, st, fs)
-        val rows = st.executeUpdate
-        val keys = st.getGeneratedKeys
-        if (rows > 0 && keys.next) {
-          val latestId = keys.getLong(1)
-          // refresh latestId for this record
-          recordToId += (record -> latestId)
-        }
-        rows
+  else transactionManager.dml{conn =>
+    val fs: Seq[Field[_]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
+    val sql = dialect.insertRecord(this, fs)
+    sqlLog.debug(sql)
+    auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
+      setParams(record, st, fs)
+      val rows = st.executeUpdate
+      val keys = st.getGeneratedKeys
+      if (rows > 0 && keys.next) {
+        val latestId = keys.getLong(1)
+        // refresh latestId for this record
+        recordToId += (record -> latestId)
       }
-    })
+      rows
+    }
+  }
   def INSERT_!(record: R, fields: Field[_]*): Int = insert_!(record, fields: _*)
 
   /**
@@ -360,6 +360,35 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
     case Some(errors) => throw new ValidationException(errors: _*)
   }
   def INSERT(record: R, fields: Field[R]*) = insert(record, fields: _*)
+
+  def batchInsert_!(records: Seq[R]): Int = {
+    if (readOnly_?)
+      throw new ORMException("The relation " + qualifiedName + " is read-only.")
+    else transactionManager.dml{conn =>
+      val sql = dialect.insertRecord(this, fields)
+      sqlLog.debug(sql)
+      val st = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
+      for (record <- records) {
+        setParams(record, st, fields)
+        st.addBatch
+      }
+      val rows = st.executeBatch
+      val keys = st.getGeneratedKeys
+      val itr = records.iterator
+      var i = 0
+      while (i < rows.length && keys.next && itr.hasNext) {
+        val latestId = keys.getLong(i)
+        // refresh latestId for this record
+        recordToId += (itr.next -> latestId)
+      }
+      1
+    }
+  }
+
+  def batchInsert(records: Seq[R]): Int = {
+    records foreach validate
+    batchInsert_!(records)
+  }
 
   /**
    * Skips the validation and performs `UPDATE` statement for this record.
