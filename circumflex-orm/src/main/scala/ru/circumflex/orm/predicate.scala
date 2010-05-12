@@ -26,8 +26,7 @@ object EmptyPredicate extends Predicate {
  * Simple expression.
  */
 class SimpleExpression(val expression: String,
-                       val parameters: Seq[Any])
-    extends Predicate {
+                       val parameters: Seq[Any]) extends Predicate {
   def toSql = expression
 }
 
@@ -35,8 +34,7 @@ class SimpleExpression(val expression: String,
  * Aggregation of multiple `predicates` with specified `operator`.
  */
 class AggregatePredicate(val operator: String,
-                         protected var predicates: Seq[Predicate])
-    extends Predicate {
+                         protected var predicates: Seq[Predicate]) extends Predicate {
   def parameters = predicates.flatMap(_.parameters)
   def add(predicate: Predicate*): this.type = {
     predicates ++= predicate.toList
@@ -44,7 +42,7 @@ class AggregatePredicate(val operator: String,
   }
   def toSql: String =
     if (predicates.size == 0) EmptyPredicate.toSql
-    else "(" + predicates.map(_.toSql).mkString(" " + operator + " ") + ")"
+  else "(" + predicates.map(_.toSql).mkString(" " + operator + " ") + ")"
 }
 
 /**
@@ -52,9 +50,9 @@ class AggregatePredicate(val operator: String,
  */
 class SubqueryExpression[T](expression: String,
                             val subquery: SQLQuery[T])
-    extends SimpleExpression(
-      dialect.subquery(expression, subquery),
-      subquery.parameters)
+extends SimpleExpression(
+  dialect.subquery(expression, subquery),
+  subquery.parameters)
 
 // ## Helper
 

@@ -29,9 +29,9 @@ trait Query extends SQLable with ParameterizedExpression {
   def setParams(st: PreparedStatement, startIndex: Int): Int = {
     var paramsCounter = startIndex;
     parameters.foreach(p => {
-      typeConverter.write(st, p, paramsCounter)
-      paramsCounter += 1
-    })
+        typeConverter.write(st, p, paramsCounter)
+        paramsCounter += 1
+      })
     return paramsCounter
   }
 
@@ -72,11 +72,11 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
   /**
    * Execute a query, open a JDBC `ResultSet` and executes specified `actions`.
    */
-  def resultSet[A](actions: ResultSet => A): A = transactionManager.sql(toSql)(st => {
+  def resultSet[A](actions: ResultSet => A): A = transactionManager.sql(toSql){st =>
     sqlLog.debug(toSql)
     setParams(st, 1)
     auto(st.executeQuery)(actions)
-  })
+  }
 
   // ### Executors
 
@@ -89,11 +89,11 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
    * Execute a query and return `Seq[T]`, where `T` is designated by query projection.
    */
   def list(): Seq[T] = resultSet(rs => {
-    val result = new ListBuffer[T]()
-    while (rs.next)
-      result += read(rs)
-    return result
-  })
+      val result = new ListBuffer[T]()
+      while (rs.next)
+        result += read(rs)
+      return result
+    })
 
   /**
    * Execute a query and return a unique result.
@@ -101,18 +101,18 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
    * An exception is thrown if result set yields more than one row.
    */
   def unique(): Option[T] = resultSet(rs => {
-    if (!rs.next) return None
-    else if (rs.isLast) return Some(read(rs))
-    else throw new ORMException("Unique result expected, but multiple rows found.")
-  })
+      if (!rs.next) return None
+      else if (rs.isLast) return Some(read(rs))
+      else throw new ORMException("Unique result expected, but multiple rows found.")
+    })
 
 }
 
 // ## Native SQL
 
 class NativeSQLQuery[T](projection: Projection[T],
-                        expression: ParameterizedExpression)
-    extends SQLQuery[T](projection) {
+                        expression: ParameterizedExpression
+) extends SQLQuery[T](projection) {
   def parameters = expression.parameters
   def toSql = expression.toSql.replaceAll("\\{\\*\\}", projection.toSql)
 }
@@ -140,7 +140,7 @@ class Select[T](projection: Projection[T]) extends SQLQuery[T](projection) {
    * Query parameters.
    */
   def parameters: Seq[Any] = _where.parameters ++
-      _having.parameters ++
+  _having.parameters ++
       _setOps.flatMap(p => p._2.parameters) ++
       _orders.flatMap(_.parameters)
 
@@ -226,7 +226,7 @@ class Select[T](projection: Projection[T]) extends SQLQuery[T](projection) {
     proj.toList.foreach(p => addGroupByProjection(p))
     return this
   }
-  def GROUP_BY(proj: Projection[_]*) = groupBy(proj: _*)
+  def GROUP_BY(proj: Projection[_]*): Select[T] = groupBy(proj: _*)
 
   protected def addGroupByProjection(proj: Projection[_]): Unit =
     findProjection(projection, p => p.equals(proj)) match {
@@ -242,12 +242,12 @@ class Select[T](projection: Projection[T]) extends SQLQuery[T](projection) {
    */
   protected def findProjection(projection: Projection[_],
                                predicate: Projection[_] => Boolean): Option[Projection[_]] =
-    if (predicate(projection)) return Some(projection)
-    else projection match {
-      case p: CompositeProjection[_] =>
-        return p.subProjections.find(predicate)
-      case _ => return None
-    }
+                                 if (predicate(projection)) return Some(projection)
+  else projection match {
+    case p: CompositeProjection[_] =>
+      return p.subProjections.find(predicate)
+    case _ => return None
+  }
 
   // ### Set Operations
 
@@ -328,13 +328,13 @@ trait DMLQuery extends Query {
    * Execute a query and return the number of affected rows.
    */
   def execute(): Int = transactionManager.dml(conn => {
-    val sql = toSql
-    sqlLog.debug(sql)
-    auto(conn.prepareStatement(sql))(st => {
-      setParams(st, 1)
-      st.executeUpdate
+      val sql = toSql
+      sqlLog.debug(sql)
+      auto(conn.prepareStatement(sql))(st => {
+          setParams(st, 1)
+          st.executeUpdate
+        })
     })
-  })
 }
 
 // ## Native DML
@@ -352,9 +352,9 @@ class NativeDMLQuery(expression: ParameterizedExpression) extends DMLQuery {
  *
  * The projections of `query` must match the columns of target `relation`.
  */
-class InsertSelect[R <: Record[R]](val relation: Relation[R],
-                                   val query: SQLQuery[_])
-    extends DMLQuery {
+class InsertSelect[R <: AnyRef](val relation: Relation[R],
+                                val query: SQLQuery[_]
+) extends DMLQuery {
   if (relation.readOnly_?)
     throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
   def parameters = query.parameters
@@ -364,7 +364,7 @@ class InsertSelect[R <: Record[R]](val relation: Relation[R],
 /**
  * A lil helper to keep stuff DSL'ly.
  */
-class InsertSelectHelper[R <: Record[R]](val relation: Relation[R]) {
+class InsertSelectHelper[R <: AnyRef](val relation: Relation[R]) {
   def select[T](projection: Projection[T]) = new InsertSelect(relation, new Select(projection))
   def SELECT[T](projection: Projection[T]) = select(projection)
 }
@@ -374,8 +374,7 @@ class InsertSelectHelper[R <: Record[R]](val relation: Relation[R]) {
 /**
  * Functionality for DELETE query.
  */
-class Delete[R <: Record[R]](val node: RelationNode[R])
-    extends DMLQuery {
+class Delete[R <: AnyRef](val node: RelationNode[R]) extends DMLQuery {
   val relation = node.relation
   if (relation.readOnly_?)
     throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
@@ -400,8 +399,7 @@ class Delete[R <: Record[R]](val node: RelationNode[R])
 /**
  * Functionality for UPDATE query.
  */
-class Update[R <: Record[R]](val relation: Relation[R])
-    extends DMLQuery {
+class Update[R <: AnyRef](val relation: Relation[R]) extends DMLQuery {
   if (relation.readOnly_?)
     throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
 
@@ -409,20 +407,20 @@ class Update[R <: Record[R]](val relation: Relation[R])
 
   private var _setClause: Seq[Pair[Field[_], Any]] = Nil
   def setClause = _setClause
-  def set[T](field: Field[T], value: T): Update[R] = {
+  def set[T](field: Field[_], value: Any): Update[R] = {
     _setClause ++= List(field -> value)
     return this
   }
-  def SET[T](field: Field[T], value: T): Update[R] = set(field, value)
-  def set[P <: Record[P]](association: Association[R, P], value: P): Update[R]=
-    set(association.field, value.id.get)
-  def SET[P <: Record[P]](association: Association[R, P], value: P): Update[R] =
+  def SET[T](field: Field[_], value: Any): Update[R] = set(field, value)
+  def set[F <: AnyRef](association: Association[R, F], value: F): Update[R] =
+    set(association.field, association.foreignRelation.idOf(value))
+  def SET[P <: AnyRef](association: Association[R, P], value: P): Update[R] =
     set(association, value)
-  def setNull[T](field: Field[T]): Update[R] = set(field, null.asInstanceOf[T])
-  def SET_NULL[T](field: Field[T]): Update[R] = setNull(field)
-  def setNull[P <: Record[P]](association: Association[R, P]): Update[R] =
+  def setNull[T](field: Field[_]): Update[R] = set(field, null.asInstanceOf[T])
+  def SET_NULL[T](field: Field[_]): Update[R] = setNull(field)
+  def setNull[P <: AnyRef](association: Association[R, P]): Update[R] =
     setNull(association.field)
-  def SET_NULL[P <: Record[P]](association: Association[R, P]): Update[R] =
+  def SET_NULL[P <: AnyRef](association: Association[R, P]): Update[R] =
     setNull(association)
 
   // ### WHERE clause
@@ -433,7 +431,7 @@ class Update[R <: Record[R]](val relation: Relation[R])
     this._where = predicate
     return this
   }
-  def WHERE(predicate: Predicate) = where(predicate)
+  def WHERE(predicate: Predicate): Update[R] = where(predicate)
 
   // ### Miscellaneous
 

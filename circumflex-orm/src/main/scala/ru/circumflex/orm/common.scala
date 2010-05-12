@@ -1,5 +1,9 @@
 package ru.circumflex.orm
 
+import java.math.BigInteger
+import java.lang.reflect.Method
+import java.math.BigDecimal
+import java.util.ArrayList
 import org.slf4j.LoggerFactory
 import ORM._
 import ru.circumflex.core.WrapperModel
@@ -183,7 +187,7 @@ case class SetOperation(val toSql: String) extends SQLable {
  * An expression to use in `ORDER BY` clause.
  */
 class Order(val expression: String, val parameters: Seq[Any])
-    extends ParameterizedExpression {
+extends ParameterizedExpression {
 
   // Specificator (`ASC` or `DESC`).
 
@@ -216,8 +220,8 @@ object JDBC {
   protected[orm] val sqlLog = LoggerFactory.getLogger("ru.circumflex.orm")
 
   def autoClose[A <: {def close(): Unit}, B](obj: A)
-                                            (actions: A => B)
-                                            (errors: Throwable => B): B =
+  (actions: A => B)
+  (errors: Throwable => B): B =
     try {
       return actions(obj)
     } catch {
@@ -227,7 +231,7 @@ object JDBC {
     }
 
   def auto[A <: {def close(): Unit}, B](obj: A)
-                                       (actions: A => B): B =
+  (actions: A => B): B =
     autoClose(obj)(actions)(throw _)
 }
 
@@ -240,3 +244,4 @@ class ORMException(msg: String, cause: Throwable) extends Exception(msg, cause) 
   def this(msg: String) = this(msg, null)
   def this(cause: Throwable) = this(null, cause)
 }
+

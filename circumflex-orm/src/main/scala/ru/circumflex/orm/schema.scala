@@ -19,7 +19,7 @@ class Schema(val name: String) extends SchemaObject {
  */
 abstract class Constraint(val relation: Relation[_],
                           val constraintName: String)
-    extends SchemaObject with SQLable {
+extends SchemaObject with SQLable {
 
   val objectName = "CONSTRAINT " + constraintName
   val sqlCreate = dialect.alterTableAddConstraint(this)
@@ -37,7 +37,7 @@ abstract class Constraint(val relation: Relation[_],
 class UniqueKey(relation: Relation[_],
                 name: String,
                 val fields: Seq[Field[_]])
-    extends Constraint(relation, name) {
+extends Constraint(relation, name) {
   def sqlDefinition = dialect.uniqueKeyDefinition(this)
 }
 
@@ -51,7 +51,7 @@ class ForeignKey(relation: Relation[_],
                  val foreignFields: Seq[Field[_]],
                  protected var _onDelete: ForeignKeyAction,
                  protected var _onUpdate: ForeignKeyAction)
-    extends Constraint(relation, name) {
+extends Constraint(relation, name) {
 
   def onDelete = _onDelete
   def onDelete(action: ForeignKeyAction): this.type = {
@@ -76,7 +76,7 @@ class ForeignKey(relation: Relation[_],
 class CheckConstraint(relation: Relation[_],
                       name: String,
                       val expression: String)
-    extends Constraint(relation, name) {
+extends Constraint(relation, name) {
   def sqlDefinition = dialect.checkConstraintDefinition(this)
 }
 
@@ -102,23 +102,23 @@ class ConstraintHelper(relation: Relation[_], name: String) {
                  localFields: Seq[Field[_]],
                  foreignFields: Seq[Field[_]]): ForeignKey = {
     val fk = new ForeignKey(relation, name, foreignRelation, localFields, foreignFields,
-      NO_ACTION, NO_ACTION)
+                            NO_ACTION, NO_ACTION)
     relation._constraints ++= List(fk)
     return fk
   }
   def FOREIGN_KEY(foreignRelation: Relation[_],
                   localFields: Seq[Field[_]],
-                  foreignFields: Seq[Field[_]]): ForeignKey =
+                  foreignFields: Seq[Field[_]]
+  ): ForeignKey =
     foreignKey(foreignRelation, localFields, foreignFields)
 
   def foreignKey(foreignRelation: Relation[_],
                  fields: Pair[Field[_], Field[_]]*): ForeignKey = {
     val localFileds = fields.map(_._1)
     val foreignFields = fields.map(_._2)
-    return foreignKey(foreignRelation, localFileds, foreignFields)
+    foreignKey(foreignRelation, localFileds, foreignFields)
   }
-  def FOREIGN_KEY(foreignRelation: Relation[_],
-                  fields: Pair[Field[_], Field[_]]*): ForeignKey =
+  def FOREIGN_KEY(foreignRelation: Relation[_], fields: Pair[Field[_], Field[_]]*): ForeignKey =
     foreignKey(foreignRelation, fields: _*)
 
   def foreignKey(localFields: Field[_]*): ForeignKeyHelper =
@@ -134,12 +134,11 @@ class ForeignKeyHelper(relation: Relation[_], name: String, localFields: Seq[Fie
   def references(foreignRelation: Relation[_],
                  foreignFields: Field[_]*): ForeignKey = {
     val fk = new ForeignKey(relation, name, foreignRelation, localFields, foreignFields,
-      NO_ACTION, NO_ACTION)
+                            NO_ACTION, NO_ACTION)
     relation._constraints ++= List(fk)
     return fk
   }
-  def REFERENCES(foreignRelation: Relation[_],
-                 foreignFields: Field[_]*): ForeignKey =
+  def REFERENCES(foreignRelation: Relation[_], foreignFields: Field[_]*): ForeignKey =
     references(foreignRelation, foreignFields: _*)
 }
 
@@ -151,7 +150,7 @@ class ForeignKeyHelper(relation: Relation[_], name: String, localFields: Seq[Fie
 class Index(val relation: Relation[_],
             val name: String,
             expressions: String*)
-    extends SchemaObject {
+extends SchemaObject {
 
   def expression = expressions.mkString(", ")
 

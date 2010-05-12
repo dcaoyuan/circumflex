@@ -84,11 +84,11 @@ object ORM {
 
   def lastAlias: Option[String] =
     if (_lastAlias.get == null) None
-    else {
-      val a = _lastAlias.get
-      _lastAlias.set(null)
-      Some(a)
-    }
+  else {
+    val a = _lastAlias.get
+    _lastAlias.set(null)
+    Some(a)
+  }
   def lastAlias(alias: String): Unit = _lastAlias.set(alias)
 
 }
@@ -141,9 +141,9 @@ class DefaultConnectionProvider extends ConnectionProvider {
     case Some("repeatable_read") => Connection.TRANSACTION_REPEATABLE_READ
     case Some("serializable") => Connection.TRANSACTION_SERIALIZABLE
     case _ => {
-      ormLog.info("Using READ COMMITTED isolation, override 'orm.connection.isolation' if necesssary.")
-      Connection.TRANSACTION_READ_COMMITTED
-    }
+        ormLog.info("Using READ COMMITTED isolation, override 'orm.connection.isolation' if necesssary.")
+        Connection.TRANSACTION_READ_COMMITTED
+      }
   }
 
   /**
@@ -152,40 +152,40 @@ class DefaultConnectionProvider extends ConnectionProvider {
    */
   protected val ds: DataSource = Circumflex("orm.connection.datasource") match {
     case Some(jndiName: String) => {
-      val ctx = new InitialContext
-      val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
-      ormLog.info("Using JNDI datasource ({}).", jndiName)
-      ds
-    }
+        val ctx = new InitialContext
+        val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
+        ormLog.info("Using JNDI datasource ({}).", jndiName)
+        ds
+      }
     case _ => {
-      ormLog.info("Using c3p0 connection pooling.")
-      val driver = Circumflex("orm.connection.driver") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ORMException("Missing mandatory configuration parameter 'orm.connection.driver'.")
+        ormLog.info("Using c3p0 connection pooling.")
+        val driver = Circumflex("orm.connection.driver") match {
+          case Some(s: String) => s
+          case _ =>
+            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.driver'.")
+        }
+        val url = Circumflex("orm.connection.url") match {
+          case Some(s: String) => s
+          case _ =>
+            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.url'.")
+        }
+        val username = Circumflex("orm.connection.username") match {
+          case Some(s: String) => s
+          case _ =>
+            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.username'.")
+        }
+        val password = Circumflex("orm.connection.password") match {
+          case Some(s: String) => s
+          case _ =>
+            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.password'.")
+        }
+        val ds = new ComboPooledDataSource()
+        ds.setDriverClass(driver)
+        ds.setJdbcUrl(url)
+        ds.setUser(username)
+        ds.setPassword(password)
+        ds
       }
-      val url = Circumflex("orm.connection.url") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ORMException("Missing mandatory configuration parameter 'orm.connection.url'.")
-      }
-      val username = Circumflex("orm.connection.username") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ORMException("Missing mandatory configuration parameter 'orm.connection.username'.")
-      }
-      val password = Circumflex("orm.connection.password") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ORMException("Missing mandatory configuration parameter 'orm.connection.password'.")
-      }
-      val ds = new ComboPooledDataSource()
-      ds.setDriverClass(driver)
-      ds.setJdbcUrl(url)
-      ds.setUser(username)
-      ds.setPassword(password)
-      ds
-    }
   }
 
   def dataSource: DataSource = ds

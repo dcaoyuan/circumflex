@@ -24,9 +24,12 @@ class Dialect {
 
   def longType = "BIGINT"
   def integerType = "INTEGER"
+  def floatType = "FLOAT"
+  def doubleType = "DOUBLE"
   def numericType = "NUMERIC"
   def textType = "TEXT"
   def varcharType = "VARCHAR"
+  def varbinaryType = "VARBINARY"
   def booleanType = "BOOLEAN"
   def dateType = "DATE"
   def timeType = "TIME"
@@ -192,11 +195,11 @@ class Dialect {
   /**
    * Produce `CREATE TABLE` statement without constraints.
    */
-  def createTable(table: Table[_]) =
+  def createTable(table: Table[_]) = (
     "CREATE TABLE " + table.qualifiedName + " (" +
-        table.fields.map(_.toSql).mkString(", ") +
-        ", PRIMARY KEY (" + table.primaryKey.name + "))"
-
+    table.fields.map(_.toSql).mkString(", ") +
+    ", PRIMARY KEY (" + table.primaryKey.name + "))"
+  )
   /**
    * Produce `DROP TABLE` statement.
    */
@@ -208,8 +211,8 @@ class Dialect {
    */
   def createView(view: View[_]) =
     "CREATE VIEW " + view.qualifiedName + " (" +
-        view.fields.map(_.name).mkString(", ") + ") AS " +
-        view.query.toInlineSql
+  view.fields.map(_.name).mkString(", ") + ") AS " +
+  view.query.toInlineSql
 
   /**
    * Produce `DROP VIEW` statement.
@@ -224,7 +227,7 @@ class Dialect {
     var result = "CREATE "
     if (idx.unique_?) result += "UNIQUE "
     result += "INDEX " + idx.name + " ON " + idx.relation.qualifiedName +
-        " USING " + idx.using + " (" + idx.expression + ")"
+    " USING " + idx.using + " (" + idx.expression + ")"
     if (idx.where != EmptyPredicate)
       result += " WHERE " + idx.where.toInlineSql
     return result
@@ -268,8 +271,8 @@ class Dialect {
   /**
    * An expression for primary key column.
    */
-  def primaryKeyExpression(record: Record[_]) =
-    "DEFAULT NEXTVAL('" + pkSequenceName(record.relation) + "')"
+  def primaryKeyExpression(relation: Relation[_]) =
+    "DEFAULT NEXTVAL('" + pkSequenceName(relation) + "')"
 
   protected def pkSequenceName(relation: Relation[_]) =
     relation.qualifiedName + "_" + relation.primaryKey.name + "_seq"
@@ -284,13 +287,13 @@ class Dialect {
    * Produce foreign key constraint definition for association (e.g.
    * `FOREIGN KEY (country_id) REFERENCES country(id) ON DELETE CASCADE`).
    */
-  def foreignKeyDefinition(fk: ForeignKey) =
+  def foreignKeyDefinition(fk: ForeignKey) = (
     "FOREIGN KEY (" + fk.localFields.map(_.name).mkString(", ") +
-        ") REFERENCES " + fk.foreignRelation.qualifiedName + " (" +
-        fk.foreignFields.map(_.name).mkString(", ") + ") " +
-        "ON DELETE " + fk.onDelete.toSql + " " +
-        "ON UPDATE " + fk.onUpdate.toSql
-
+    ") REFERENCES " + fk.foreignRelation.qualifiedName + " (" +
+    fk.foreignFields.map(_.name).mkString(", ") + ") " +
+    "ON DELETE " + fk.onDelete.toSql + " " +
+    "ON UPDATE " + fk.onUpdate.toSql
+  )
   /**
    * Produces check constraint definition (e.g. `CHECK (index > 0)`).
    */
@@ -315,8 +318,8 @@ class Dialect {
     node match {
       case j: JoinNode[_, _] =>
         result += joinInternal(j.left, on) +
-            " " + j.joinType.toSql + " " +
-            joinInternal(j.right, j.sqlOn)
+        " " + j.joinType.toSql + " " +
+        joinInternal(j.right, j.sqlOn)
       case _ =>
         result += node.toSql
         if (on != null) result += " " + on
@@ -351,45 +354,45 @@ class Dialect {
       result += " OFFSET " + q.offset
     return result
   }
-
+  
   // ### DML
 
   /**
    * Produce `INSERT INTO .. VALUES` statement for specified `record` and specified `fields`.
    */
-  def insertRecord(record: Record[_], fields: Seq[Field[_]]) =
-    "INSERT INTO " + record.relation.qualifiedName +
-        " (" + fields.map(_.name).mkString(", ") +
-        ") VALUES (" + fields.map(f => "?").mkString(", ") + ")"
+  def insertRecord(relation: Relation[_], fields: Seq[Field[_]]) =
+    "INSERT INTO " + relation.qualifiedName +
+  " (" + fields.map(_.name).mkString(", ") +
+  ") VALUES (" + fields.map(f => "?").mkString(", ") + ")"
 
   /**
    * Produce `UPDATE` statement with primary key criteria for specified `record` using specified
    * `fields` in the `SET` clause.
    */
-  def updateRecord(record: Record[_], fields: Seq[Field[_]]): String =
-    "UPDATE " + record.relation.qualifiedName +
-        " SET " + fields.map(_.name + " = ?").mkString(", ") +
-        " WHERE " + record.id.name + " = ?"
+  def updateRecord(relation: Relation[_], fields: Seq[Field[_]]): String =
+    "UPDATE " + relation.qualifiedName +
+  " SET " + fields.map(_.name + " = ?").mkString(", ") +
+  " WHERE " + relation.id.name + " = ?"
 
   /**
    * Produce `DELETE` statement for specified `record`.
    */
-  def deleteRecord(record: Record[_]): String =
-    "DELETE FROM " + record.relation.qualifiedName +
-        " WHERE " + record.id.name + " = ?"
+  def deleteRecord(relation: Relation[_]): String =
+    "DELETE FROM " + relation.qualifiedName +
+  " WHERE " + relation.id.name + " = ?"
 
   /**
    * Produce `INSERT .. SELECT` statement.
    */
   def insertSelect(dml: InsertSelect[_]) = "INSERT INTO " + dml.relation.qualifiedName + " (" +
-      dml.relation.fields.map(_.name).mkString(", ") + ") " + dml.query.toSql
+  dml.relation.fields.map(_.name).mkString(", ") + ") " + dml.query.toSql
 
   /**
    * Produce `UPDATE` statement.
    */
   def update(dml: Update[_]): String = {
     var result = "UPDATE " + dml.relation.qualifiedName + " SET " +
-        dml.setClause.map(_._1.name + " = ?").mkString(", ")
+    dml.setClause.map(_._1.name + " = ?").mkString(", ")
     if (dml.where != EmptyPredicate) result += " WHERE " + dml.where.toSql
     return result
   }

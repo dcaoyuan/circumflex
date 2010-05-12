@@ -9,8 +9,14 @@ import java.lang.String
  * **Relation Node** is essentially a wrapper around `Relation` that
  * provides an `alias` so that it can be used in SQL queries.
  */
-class RelationNode[R <: Record[R]](val relation: Relation[R])
-        extends SQLable with Cloneable {
+abstract class RelationNode[R <: AnyRef] extends SQLable
+                                            with Cloneable {
+
+  /**
+   * Since we need to return a object in most case, let it to be deferred
+   * @see Relation#as(String)
+   */
+  val relation: Relation[R]
 
   // ### Alias
 
@@ -49,42 +55,44 @@ class RelationNode[R <: Record[R]](val relation: Relation[R])
 
   // ### Joins
 
-  def findAssociation[F <: Record[F]](node: RelationNode[F]): Option[Association[R, F]] =
+  def findAssociation[F <: AnyRef](node: RelationNode[F]): Option[Association[R, F]] =
     relation.findAssociation(node.relation)
 
   /**
    * Explicit join.
    */
-  def join[J <: Record[J]](node: RelationNode[J],
-                           on: String,
-                           joinType: JoinType): JoinNode[R, J] =
+  def join[J <: AnyRef](node: RelationNode[J],
+                        on: String,
+                        joinType: JoinType
+  ): JoinNode[R, J] =
     new ExplicitJoin(this, node, on, joinType)
 
-  def JOIN[J <: Record[J]](node: RelationNode[J],
-                           on: String,
-                           joinType: JoinType): JoinNode[R, J] =
+  def JOIN[J <: AnyRef](node: RelationNode[J],
+                        on: String,
+                        joinType: JoinType
+  ): JoinNode[R, J] =
     join(node, on, joinType)
 
   /**
    * Auto-join (the `ON` subclause is evaluated by searching matching association).
    */
-  def join[J <: Record[J]](node: RelationNode[J],
-                           joinType: JoinType = LEFT_JOIN): JoinNode[R, J] =
-    findAssociation(node) match {
+  def join[J <: AnyRef](node: RelationNode[J],
+                        joinType: JoinType = LEFT_JOIN): JoinNode[R, J] =
+                          findAssociation(node) match {
       case Some(a: Association[R, J]) =>  // many-to-one join
         new ManyToOneJoin[R, J](this, node, a, joinType)
       case _ => node.findAssociation(this) match {
-        case Some(a: Association[J, R]) =>  // one-to-many join
-          new OneToManyJoin[R, J](this, node, a, joinType)
-        case _ =>
-          throw new ORMException("Failed to join " + this + " and " + node +
-                  ": no associations found.")
-      }
+          case Some(a: Association[J, R]) =>  // one-to-many join
+            new OneToManyJoin[R, J](this, node, a, joinType)
+          case _ =>
+            throw new ORMException("Failed to join " + this + " and " + node +
+                                   ": no associations found.")
+        }
     }
 
-  def JOIN[J <: Record[J]](node: RelationNode[J],
-                           joinType: JoinType = LEFT_JOIN): JoinNode[R, J] =
-    join(node, joinType)
+  def JOIN[J <: AnyRef](node: RelationNode[J],
+                        joinType: JoinType = LEFT_JOIN): JoinNode[R, J] =
+                          join(node, joinType)
 
   // ### Equality and others
 
@@ -113,9 +121,8 @@ class RelationNode[R <: Record[R]](val relation: Relation[R])
  * In order to organize joined nodes into tree we introduce this proxy
  * for `RelationNode`. It delegates all methods to underlying `node`.
  */
-class ProxyNode[R <: Record[R]](protected[orm] var node: RelationNode[R])
-        extends RelationNode[R](node.relation) {
-
+class ProxyNode[R <: AnyRef](protected[orm] var node: RelationNode[R]) extends RelationNode[R] {
+  val relation = node.relation
   override def alias = node.alias
   override def as(alias: String): this.type = {
     node.as(alias)
@@ -148,10 +155,10 @@ class ProxyNode[R <: Record[R]](protected[orm] var node: RelationNode[R])
 /**
  * This node represents a relational join between two nodes (`left` and `right`).
  */
-abstract class JoinNode[L <: Record[L], R <: Record[R]](
-        protected var _left: RelationNode[L],
-        protected var _right: RelationNode[R],
-        protected var _joinType: JoinType) extends ProxyNode[L](_left) {
+abstract class JoinNode[L <: AnyRef, R <: AnyRef](
+  protected var _left: RelationNode[L],
+  protected var _right: RelationNode[R],
+  protected var _joinType: JoinType) extends ProxyNode[L](_left) {
 
   def left = _left
   def right = _right
@@ -191,8 +198,8 @@ abstract class JoinNode[L <: Record[L], R <: Record[R]](
    * The underlying relations of nodes remain unchanged.
    */
   override def clone(): this.type = super.clone()
-          .replaceLeft(this.left.clone)
-          .replaceRight(this.right.clone)
+  .replaceLeft(this.left.clone)
+  .replaceRight(this.right.clone)
 
   override def toString = "(" + left + " -> " + right + ")"
 }
@@ -200,32 +207,32 @@ abstract class JoinNode[L <: Record[L], R <: Record[R]](
 /**
  * A join with explicit join condition.
  */
-class ExplicitJoin[L <: Record[L], R <: Record[R]](
-        left: RelationNode[L],
-        right: RelationNode[R],
-        val on: String,
-        joinType: JoinType) extends JoinNode[L, R](left, right, joinType)
+class ExplicitJoin[L <: AnyRef, R <: AnyRef](
+  left: RelationNode[L],
+  right: RelationNode[R],
+  val on: String,
+  joinType: JoinType) extends JoinNode[L, R](left, right, joinType)
 
 /**
  * A join in many-to-one direction.
  */
-class ManyToOneJoin[L <: Record[L], R <: Record[R]](
-        childNode: RelationNode[L],
-        parentNode: RelationNode[R],
-        val association: Association[L, R],
-        joinType: JoinType) extends JoinNode[L, R](childNode, parentNode, joinType) {
+class ManyToOneJoin[L <: AnyRef, R <: AnyRef](
+  childNode: RelationNode[L],
+  parentNode: RelationNode[R],
+  val association: Association[L, R],
+  joinType: JoinType) extends JoinNode[L, R](childNode, parentNode, joinType) {
   def on = childNode.alias + "." + association.name + " = " +
-          parentNode.alias + "." + association.foreignRelation.primaryKey.name
+  parentNode.alias + "." + association.foreignRelation.primaryKey.name
 }
 
 /**
  * A join in one-to-many direction.
  */
-class OneToManyJoin[L <: Record[L], R <: Record[R]](
-        parentNode: RelationNode[L],
-        childNode: RelationNode[R],
-        val association: Association[R, L],
-        joinType: JoinType) extends JoinNode[L, R](parentNode, childNode, joinType) {
+class OneToManyJoin[L <: AnyRef, R <: AnyRef](
+  parentNode: RelationNode[L],
+  childNode: RelationNode[R],
+  val association: Association[R, L],
+  joinType: JoinType) extends JoinNode[L, R](parentNode, childNode, joinType) {
   def on = childNode.alias + "." + association.name + " = " +
-          parentNode.alias + "." + association.foreignRelation.primaryKey.name
+  parentNode.alias + "." + association.foreignRelation.primaryKey.name
 }

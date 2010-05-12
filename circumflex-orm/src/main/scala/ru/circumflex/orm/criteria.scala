@@ -10,8 +10,8 @@ package ru.circumflex.orm
  * Criteria API is designed to operate on `Record`s specifically. If
  * you want to use different projections, use `Select` instead.
  */
-class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
-    extends SQLable with Cloneable {
+class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
+                                                              with Cloneable {
 
   private var _counter = 0
   protected def nextCounter: Int = {
@@ -46,7 +46,7 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
    */
   protected def replaceLeft(join: JoinNode[R, _],
                             node: RelationNode[R]): RelationNode[R] =
-    join.left match {
+                              join.left match {
       case j: JoinNode[R, _] => replaceLeft(j, node)
       case r: RelationNode[R] => join.replaceLeft(node)
     }
@@ -55,29 +55,27 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
    * Attempt to search the root tree of query plan for relations of specified `association`
    * and correspondingly update it if necessary.
    */
-  protected def updateRootTree[N <: Record[N], P <: Record[P], C <: Record[C]](
-      node: RelationNode[N],
-      association: Association[C, P]): RelationNode[N] =
-    node match {
-      case j: JoinNode[C, P] => j.replaceLeft(updateRootTree(j.left, association))
-          .replaceRight(updateRootTree(j.right, association))
-      case j: JoinNode[P, C] => j.replaceLeft(updateRootTree(j.left, association))
-          .replaceRight(updateRootTree(j.right, association))
+  protected def updateRootTree[N <: AnyRef, P <: AnyRef, C <: AnyRef](
+    node: RelationNode[N],
+    association: Association[C, P]): RelationNode[N] =
+      node match {
+      case j: JoinNode[_, _] => j.replaceLeft(updateRootTree(j.left, association))
+        .replaceRight(updateRootTree(j.right, association))
       case node: RelationNode[N] =>
-        if (node.relation == association.record.relation) {   // N == C
+        if (node.relation == association.relation) {   // N == C
           val a = association.asInstanceOf[Association[N, P]]
           new ManyToOneJoin(node, preparePf(a.foreignRelation, a), a, LEFT_JOIN)
         } else if (node.relation == association.foreignRelation) {  // N == P
           val a = association.asInstanceOf[Association[C, N]]
-          new OneToManyJoin(node, preparePf(a.record.relation, a), a, LEFT_JOIN)
+          new OneToManyJoin(node, preparePf(a.relation, a), a, LEFT_JOIN)
         } else node
     }
 
   /**
    * Prepare specified `node` and `association` to participate in prefetching.
    */
-  protected def preparePf[N <: Record[N]](relation: Relation[N],
-                                          association: Association[_, _]): RelationNode[N] = {
+  protected def preparePf[N <: AnyRef](relation: Relation[N],
+                                       association: Association[_, _]): RelationNode[N] = {
     val node = relation.as("pf_" + nextCounter)
     _projections ++= List(node.*)
     _prefetchSeq ++= List[Association[_,_]](association)
@@ -87,15 +85,15 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
   /**
    * Perform a depth-search and add specified `node` to specified `tree` of joins.
    */
-  protected def updateJoinTree[N <: Record[N]](node: RelationNode[N],
-                                               tree: RelationNode[R]): RelationNode[R] =
-    tree match {
+  protected def updateJoinTree[N <: AnyRef](node: RelationNode[N],
+                                            tree: RelationNode[R]): RelationNode[R] =
+                                              tree match {
       case j: JoinNode[R, R] => try {   // try the left side
-        j.replaceLeft(updateJoinTree(node, j.left))
-      } catch {
-        case e: ORMException =>         // try the right side
-          j.replaceRight(updateJoinTree(node, j.right))
-      }
+          j.replaceLeft(updateJoinTree(node, j.left))
+        } catch {
+          case e: ORMException =>         // try the right side
+            j.replaceRight(updateJoinTree(node, j.right))
+        }
       case rel: RelationNode[R] => rel.join(node)
     }
 
@@ -103,9 +101,9 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
    * Extract the information for inverse associations from specified `tuple` using
    * specified `tree`, which should appear to be a subtree of query plan.
    */
-  protected def processTupleTree[N <: Record[N], P <: Record[P], C <: Record[C]](
-      tuple: Array[_], tree: RelationNode[N]): Unit =
-    tree match {
+  protected def processTupleTree[N <: AnyRef, P <: AnyRef, C <: AnyRef](
+    tuple: Array[_], tree: RelationNode[N]): Unit =
+      tree match {
       case j: OneToManyJoin[P, C] =>
         val pNode = j.left
         val cNode = j.right
@@ -156,7 +154,6 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
     _orders ++= orders.toList
     return this
   }
-
   /**
    * Set the maximum amount of root records that will be returned by the query.
    */
@@ -176,7 +173,7 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
   /**
    * Add specified `association` to prefetch list.
    */
-  def prefetch[P <: Record[P], C <: Record[C]](association: Association[C, P]): Criteria[R] = {
+  def prefetch[P <: AnyRef, C <: AnyRef](association: Association[C, P]): Criteria[R] = {
     if (!_prefetchSeq.contains(association)) {
       // The depth-search is used to update query plan if possible.
       _rootTree = updateRootTree(_rootTree, association)
@@ -188,7 +185,7 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
   /**
    * Add specified `node` to join tree so that you can build queries with transitive criteria.
    */
-  def addJoin[N <: Record[N]](node: RelationNode[N]): Criteria[R] = {
+  def addJoin[N <: AnyRef](node: RelationNode[N]): Criteria[R] = {
     _joinTree = updateJoinTree(node, _joinTree)
     return this
   }
@@ -198,9 +195,9 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
    */
   def mkSelect: SQLQuery[Array[Any]] =
     SELECT(new UntypedTupleProjection(projections: _*))
-        .FROM(queryPlan)
-        .WHERE(predicate)
-        .ORDER_BY(_orders: _*)
+  .FROM(queryPlan)
+  .WHERE(predicate)
+  .ORDER_BY(_orders: _*)
 
   /**
    * Make a DML `UPDATE` query from this criteria. Only `WHERE` clause is used, all the
@@ -228,9 +225,9 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
   def predicate: Predicate = {
     if (_limit != -1 || _offset != 0)
       add(prepareLimitOffsetPredicate)
-    if (_restrictions.size > 0)
-      AND(_restrictions: _*)
-    else EmptyPredicate
+     if (_restrictions.size > 0)
+       AND(_restrictions: _*)
+     else EmptyPredicate
   }
 
   /**
@@ -246,7 +243,7 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
    */
   def list: Seq[R] = {
     val q = mkSelect
-    q.resultSet(rs => {
+    q.resultSet{rs =>
       var result: Seq[R] = Nil
       while (rs.next) {
         val tuple = q.read(rs)
@@ -256,7 +253,7 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
           result ++= List(root)
       }
       return result
-    })
+    }
   }
 
   /**
@@ -265,7 +262,7 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
    */
   def unique: Option[R] = {
     val q = mkSelect
-    q.resultSet(rs => {
+    q.resultSet{rs =>
       if (!rs.next) return None     // none records found
       // Okay, let's grab the first one. This would be the result eventually.
       val firstTuple = q.read(rs)
@@ -282,7 +279,7 @@ class Criteria[R <: Record[R]](val rootNode: RelationNode[R])
           throw new ORMException("Unique result expected, but multiple records found.")
       }
       return Some(result)
-    })
+    }
   }
 
   // ### Miscellaneous

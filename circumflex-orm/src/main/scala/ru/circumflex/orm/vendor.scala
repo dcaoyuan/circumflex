@@ -8,7 +8,7 @@ class MySQLDialect extends Dialect {
   override def supportsSchema_?(): Boolean = false
   override def supportsDropConstraints_?(): Boolean = false
   override def relationQualifiedName(relation: Relation[_]) = relation.relationName
-  override def primaryKeyExpression(record: Record[_]) = "AUTO_INCREMENT"
+  override def primaryKeyExpression(relation: Relation[_]) = "AUTO_INCREMENT"
   override def initializeRelation(relation: Relation[_]) = {}
   override def lastIdExpression(node: RelationNode[_]) =
     node.alias + "." + node.relation.primaryKey.name + " = LAST_INSERT_ID()"
@@ -17,7 +17,7 @@ class MySQLDialect extends Dialect {
 class OracleDialect extends Dialect {
   override def textType = "VARCHAR2(4096)"
   override def timestampType = "TIMESTAMP WITH TIMEZONE"
-  override def primaryKeyExpression(record: Record[_]) = ""
+  override def primaryKeyExpression(relation: Relation[_]) = ""
   override def initializeRelation(relation: Relation[_]) = {
     val seqName = pkSequenceName(relation)
     val seq = new SchemaObject {
@@ -30,11 +30,11 @@ class OracleDialect extends Dialect {
       def objectName = "TRIGGER " + trigName
       def sqlDrop = "DROP TRIGGER " + trigName
       def sqlCreate = "CREATE TRIGGER " + trigName +
-              " BEFORE INSERT ON " + relation.qualifiedName + " FOR EACH ROW BEGIN\n" +
-              "IF :new." + relation.primaryKey.name + " IS NULL THEN\n\t" +
-              "SELECT " + seqName + ".NEXTVAL INTO NEW." + relation.primaryKey.name +
-              " FROM " + relation.qualifiedName + ";\n" +
-              "END IF;\nEND;"
+      " BEFORE INSERT ON " + relation.qualifiedName + " FOR EACH ROW BEGIN\n" +
+      "IF :new." + relation.primaryKey.name + " IS NULL THEN\n\t" +
+      "SELECT " + seqName + ".NEXTVAL INTO NEW." + relation.primaryKey.name +
+      " FROM " + relation.qualifiedName + ";\n" +
+      "END IF;\nEND;"
     }
     relation.addPreAux(seq)
     relation.addPostAux(trig)
