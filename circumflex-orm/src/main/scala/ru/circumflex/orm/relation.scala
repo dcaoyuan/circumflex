@@ -21,7 +21,7 @@ object RelationRegistry {
 
   protected var classToRelation: Map[Class[_], Relation[_]] = Map()
 
-  def getRelation[R <: Record[R]](r: R): Relation[R] =
+  def getRelation[R <: AnyRef](r: R): Relation[R] =
     classToRelation.get(r.getClass) match {
       case Some(rel: Relation[R]) => rel
       case _ => {
@@ -166,7 +166,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def readOnly_? : Boolean = false
 
   def idOf(record: R): Option[Long] = recordToId.get(record)
-  def recordOf(id: Long): Option[R] = recordToId find {case (record, idx) => idx == id} map (_._1)
+  def recordOf(id: Long): Option[R] = recordToId find {x => x._2 == id} map (_._1)
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
