@@ -6,6 +6,8 @@ import java.sql.Statement
 import ru.circumflex.core.Circumflex
 import ru.circumflex.core.CircumflexUtil._
 import java.sql.PreparedStatement
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.WeakHashMap
 
 // ## Relations registry
@@ -56,11 +58,11 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
   val recordToId = new WeakHashMap[R, Long]
 
-  protected[orm] var _fields: List[Field[_]] = Nil
-  protected[orm] var _associations: List[Association[R, _]] = Nil
-  protected[orm] var _constraints: List[Constraint] = Nil
-  protected[orm] var _preAux: List[SchemaObject] = Nil
-  protected[orm] var _postAux: List[SchemaObject] = Nil
+  protected[orm] var _fields: Seq[Field[_]] = ListBuffer()
+  protected[orm] var _associations: Seq[Association[R, _]] = ListBuffer()
+  protected[orm] var _constraints: Seq[Constraint] = ListBuffer()
+  protected[orm] var _preAux: Seq[SchemaObject] = ListBuffer()
+  protected[orm] var _postAux: Seq[SchemaObject] = ListBuffer()
 
   /**
    * Unique identifier based on `recordClass` to identify this relation
@@ -141,14 +143,14 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
   def fields: Seq[Field[_]] = _fields
   protected[orm] def addField(field: Field[_]) {
-    _fields ::= field
+    _fields :+= field
     if (field.unique_?) unique(field)
   }
 
   def associations: Seq[Association[R, _]] = _associations
   protected[orm] def addAssociation(assoc: Association[R, _]) {
-    _associations ::= assoc
-    _constraints  ::= associationFK(assoc)
+    _associations :+= assoc
+    _constraints  :+= associationFK(assoc)
   }
 
   def constraints: Seq[Constraint] = _constraints
@@ -268,7 +270,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    * Add specified `objects` to this relation's `preAux` queue.
    */
   def addPreAux(objects: SchemaObject*): this.type = {
-    objects.foreach(o => if (!_preAux.contains(o)) _preAux ++= List(o))
+    objects.foreach(o => if (!_preAux.contains(o)) _preAux :+= o)
     return this
   }
 
@@ -276,7 +278,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    * Add specified `objects` to this relaion's `postAux` queue.
    */
   def addPostAux(objects: SchemaObject*): this.type = {
-    objects.foreach(o => if (!_postAux.contains(o)) _postAux ++= List(o))
+    objects.foreach(o => if (!_postAux.contains(o)) _postAux :+= o)
     return this
   }
 

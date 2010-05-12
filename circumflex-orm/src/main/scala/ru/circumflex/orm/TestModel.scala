@@ -131,7 +131,7 @@ object TestModel {
     val s2 = SELECT (co.*, COUNT(ci.id)) FROM (co JOIN ci) GROUP_BY (co.*) list // Seq[(Country, Int)]
     // Select all russian cities:
     val s3 = SELECT (ci.*) FROM (ci JOIN co) WHERE (co.relation.code LIKE "ru") ORDER_BY ("ci.name" ASC) list  // Seq[City]
-    val s4 = SELECT (City.*) FROM (City JOIN Country) WHERE (Country.code LIKE "ru") ORDER_BY (City.name ASC) list  // Seq[City]
+    //val s4 = SELECT (City.*) FROM (City JOIN Country) WHERE (Country.code LIKE "ru") ORDER_BY (City.name ASC) list  // Seq[City]
 
     country1.cities ++= Country.cities(country1)
     country1.cities foreach println
