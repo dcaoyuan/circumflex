@@ -361,33 +361,48 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   }
   def INSERT(record: R, fields: Field[R]*) = insert(record, fields: _*)
 
-  def batchInsert_!(records: Seq[R]): Int = {
+  def insertBatch_!(records: Array[R]): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
-    else transactionManager.dml{conn =>
-      val sql = dialect.insertRecord(this, fields)
-      sqlLog.debug(sql)
-      val st = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
-      for (record <- records) {
-        setParams(record, st, fields)
-        st.addBatch
+    else {
+      if (records.length == 0) return 0
+
+      transactionManager.dml{conn =>
+        val fs = this.fields.filter(f => f != id)
+        val sql = dialect.insertRecord(this, fs)
+        sqlLog.debug(sql)
+        val st = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
+        for (record <- records) {
+          setParams(record, st, fs)
+          st.addBatch
+        }
+        val rows = st.executeBatch
+        val keys = st.getGeneratedKeys
+        var count = 0
+        // getGeneratedKeys may return only one id (the latest)
+        var latestId = if (keys.next) keys.getLong(1) else -1
+        var i = records.length - 1
+        while (i > 0) {
+          val row = rows(i)
+          if (row > 0) {
+            count += 1
+            if (latestId > 0) {
+              // refresh latestId for this record
+              recordToId += (records(i) -> latestId)
+              latestId -= 1
+            }
+          }
+          i -= 1
+        }
+        
+        count
       }
-      val rows = st.executeBatch
-      val keys = st.getGeneratedKeys
-      val itr = records.iterator
-      var i = 0
-      while (i < rows.length && keys.next && itr.hasNext) {
-        val latestId = keys.getLong(i)
-        // refresh latestId for this record
-        recordToId += (itr.next -> latestId)
-      }
-      1
     }
   }
 
-  def batchInsert(records: Seq[R]): Int = {
+  def insertBatch(records: Array[R]): Int = {
     records foreach validate
-    batchInsert_!(records)
+    insertBatch_!(records)
   }
 
   /**
