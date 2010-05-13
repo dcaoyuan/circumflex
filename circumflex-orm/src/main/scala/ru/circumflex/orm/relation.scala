@@ -175,6 +175,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   /**
    * Create new `RelationNode` with specified `alias`.
    */
+  @deprecated("It's better not use alias, use relation name direclty")
   def as(alias: String) = (new RelationNode[R] {
       /**
        * The following code will cause the node.relation returning the actul type
@@ -214,17 +215,17 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    */
   def get(id: Long): Option[R] = tx.getCachedRecord(this, id) match {
     case Some(record: R) => Some(record)
-    case None => as("root").criteria.add("root.id" EQ id).unique
+    case None => this.criteria.add(this.id EQ id).unique
   }
 
   /**
    * Fetch all records.
    */
-  def all(limit: Int = -1, offset: Int = 0): Seq[R] = as("root").criteria
+  def all(limit: Int = -1, offset: Int = 0): Seq[R] = this.criteria
   .limit(limit)
   .offset(offset)
   .list
-  
+
   // ### Definitions
 
   /**
@@ -295,7 +296,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    * This method must be called immediately after `insert_!`.
    */
   def refetchLast(record: R) {
-    val root = as("root")
+    val root = this
     SELECT (root.*) FROM root WHERE (dialect.lastIdExpression(root)) unique match {
       case Some(r: R) => copyFields(r, record)
       case _ => throw new ORMException("Could not locate the last inserted row.")
@@ -303,9 +304,9 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   }
 
   def refetchLast(record: R, latestId: Long) {
-    val root = as("root")
+    val root = this
     val latestIdEq = if (latestId != -1)
-      root.alias + "." + root.relation.primaryKey.name + " = " + latestId
+      root.alias + "." + primaryKey.name + " = " + latestId
     else dialect.lastIdExpression(root)
     SELECT (root.*) FROM root WHERE (latestIdEq) unique match {
       case Some(r: R) => copyFields(r, record)
@@ -476,7 +477,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
     throw new ORMException("Could not refresh transient record.")
   else {
     tx.evictRecordCache(this, record)
-    val root = as("root")
+    val root = this
     val id = idOf(record).get
     SELECT (root.*) FROM root WHERE (root.id EQ id) unique match {
       case Some(r: R) => copyFields(r, record)

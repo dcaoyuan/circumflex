@@ -112,9 +112,9 @@ object TestModel {
   }
 
   def selects = {
-    val co = Country as "co"
-    val ca = Capital as "ca"
-    val ci = City as "ci"
+    val co = Country
+    val ca = Capital 
+    val ci = City 
     // Select countries with corresponding cities:
     val s1 = SELECT (co.*, ca.*) FROM (co JOIN ca) list // Seq[(Country, City)]
 
@@ -125,14 +125,13 @@ object TestModel {
         country1 = country
     }
 
-
     //def n2r[R <: AnyRef](n: RelationNode[R]): T forSome {type T <: Relation[_]} = n.relation
     //n2r(co)
 
     // Select countries and count their cities:
     val s2 = SELECT (co.*, COUNT(ci.id)) FROM (co JOIN ci) GROUP_BY (co.*) list // Seq[(Country, Int)]
     // Select all russian cities:
-    val s3 = SELECT (ci.*) FROM (ci JOIN co) WHERE (co.relation.code LIKE "ru") ORDER_BY ("ci.name" ASC) list  // Seq[City]
+    val s3 = SELECT (ci.*) FROM (ci JOIN co) WHERE (co.code LIKE "ru") ORDER_BY (ci.name ASC) list  // Seq[City]
     //val s4 = SELECT (City.*) FROM (City JOIN Country) WHERE (Country.code LIKE "ru") ORDER_BY (City.name ASC) list  // Seq[City]
 
     country1.cities ++= Country.cities(country1)

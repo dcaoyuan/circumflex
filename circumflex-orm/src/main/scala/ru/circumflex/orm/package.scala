@@ -11,7 +11,7 @@ package object orm {
   // ### Implicits
 
   implicit def relation2node[R <: AnyRef](relation: Relation[R]): RelationNode[R] =
-    relation.as("this")
+    relation.as(relation.relationName)
   implicit def string2helper(expression: String): SimpleExpressionHelper =
     new SimpleExpressionHelper(expression)
   implicit def string2predicate(expression: String): Predicate =
@@ -25,7 +25,7 @@ package object orm {
   implicit def association2field(association: Association[_, _]): Field[Long] =
     association.field
   /* implicit def relation2recordSample[R <: AnyRef](relation: Relation[R]): R =
-    relation.r */
+   relation.r */
   implicit def field2projection[T](field: Field[T]): Projection[T] =
     new ExpressionProjection[T](field2str(field))
   implicit def node2Relation[R <: AnyRef](node: RelationNode[R]) = {
@@ -34,13 +34,15 @@ package object orm {
   }
   // The most magical ones.
   /* implicit def node2record[R <: AnyRef](node: RelationNode[R]): R = {
-    lastAlias(node.alias)
-    return node.relation.r
-  } */
-  implicit def field2str(field: Field[_]): String = lastAlias match {
-    case Some(alias) => alias + "." + field.name
-    case None => field.name
-  }
+   lastAlias(node.alias)
+   return node.relation.r
+   } */
+  /* implicit def field2str(field: Field[_]): String = lastAlias match {
+   case Some(alias) => alias + "." + field.name
+   case None => field.name
+   } */
+  implicit def field2str(field: Field[_]): String =
+    field.relation.relationName + "." + field.name
   implicit def field2helper(field: Field[_]) = new SimpleExpressionHelper(field2str(field))
   implicit def field2order(field: Field[_]): Order = new Order(field2str(field), Nil)
 

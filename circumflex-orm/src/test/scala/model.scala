@@ -80,14 +80,14 @@ object Sample {
   def schema = new DDLUnit(City, Capital, Country).dropCreate
       .messages.foreach(msg => println(msg.body))
   def selects = {
-    val ci = City as "ci"
-    val co = Country as "co"
+    val ci = City
+    val co = Country
     // Select countries with corresponding cities:
     val s1 = SELECT (co.*, ci.*) FROM (co JOIN ci) list // Seq[(Country, City)]
     // Select countries and count their cities:
     val s2 = SELECT (co.*, COUNT(ci.id)) FROM (co JOIN ci) GROUP_BY (co.*) list // Seq[(Country, Int)]
     // Select all russian cities:
-    val s3 = SELECT (ci.*) FROM (ci JOIN co) WHERE (co.relation.code LIKE "ru") ORDER_BY (ci.relation.name ASC) list  // Seq[City]
+    val s3 = SELECT (ci.*) FROM (ci JOIN co) WHERE (co.code LIKE "ru") ORDER_BY (ci.name ASC) list  // Seq[City]
   }
 //  def data = Deployment
 //      .readAll(XML.load(getClass.getResourceAsStream("/test.cxd.xml")))

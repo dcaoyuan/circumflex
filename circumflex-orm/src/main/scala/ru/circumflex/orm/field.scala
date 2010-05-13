@@ -11,7 +11,7 @@ import java.util.Date
 /**
  * Each field of persistent class correspond to a field of record in a relation.
  */
-class Field[T](relation: Relation[_],
+class Field[T](val relation: Relation[_],
                val name: String,
                val uuid: String,
                val sqlType: String
@@ -82,7 +82,7 @@ class Field[T](relation: Relation[_],
   }
 }
 
-class PrimaryKeyField(val relation: Relation[_]
+class PrimaryKeyField(relation: Relation[_]
 ) extends Field[Long](relation, "id", relation.uuid + "." + "id", dialect.longType) {
   override def default = Some(dialect.primaryKeyExpression(relation))
 }

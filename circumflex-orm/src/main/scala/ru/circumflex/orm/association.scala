@@ -88,9 +88,8 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
         case None =>
           // @todo fetch right now or lazily? Should implement in one sql query?
           // one solution is return a funtion which will be applied after all query read(rs) done
-          val root = foreignRelation as "root"
-          lastAlias(root.alias)
-          (SELECT (root.*) FROM (root) WHERE (foreignRelation.id EQ id)).unique match {
+          val root = foreignRelation
+          (SELECT (root.*) FROM (root) WHERE (root.id EQ id)).unique match {
             case Some(x) =>
               foreignRelation.recordToId += (x -> id)
               tx.updateRecordCache(foreignRelation, x)
@@ -113,9 +112,8 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
     if (relation.transient_?(record)) None
     else {
       val id = relation.idOf(record).get
-      val root = foreignRelation as "root"
-      lastAlias(root.alias)
-      (SELECT (root.*) FROM (root) WHERE (foreignRelation.id EQ id)).unique match {
+      val root = foreignRelation
+      (SELECT (root.*) FROM (root) WHERE (root.id EQ id)).unique match {
         case a@Some(x) =>
           foreignRelation.recordToId += (x -> id)
           tx.updateRecordCache(foreignRelation, x)
@@ -134,9 +132,9 @@ class InverseAssociation[P <: AnyRef, C <: AnyRef](val association: Association[
     if (association.foreignRelation.transient_?(record)) Nil
     else tx.getCachedInverse(record, this) match {  // lookup in cache
       case null => // lazy fetch
-        val root = association.relation as "root"
-        lastAlias(root.alias)
-        val v = (SELECT (root.*) FROM (root) WHERE (association.field EQ association.foreignRelation.idOf(record).get)).list
+        val id = association.foreignRelation.idOf(record).get
+        val root = association.relation
+        val v = (SELECT (root.*) FROM (root) WHERE (association.field EQ id)).list
         tx.updateInverseCache(record, this, v)
         v
       case l: Seq[C] => l
