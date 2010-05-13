@@ -6,7 +6,6 @@ import java.sql.Statement
 import ru.circumflex.core.Circumflex
 import ru.circumflex.core.CircumflexUtil._
 import java.sql.PreparedStatement
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.WeakHashMap
 
@@ -549,6 +548,7 @@ class DefinitionHelper[R <: AnyRef](relation: Relation[R], name: String) {
   def text = new TextField(relation, name, uuid, dialect.textType)
   def varchar(length: Int = -1) = new TextField(relation, name, uuid, length)
   def varbinary(length: Int = -1) = new VarbinaryField(relation, name, uuid, length)
+  def serialized[T](tpe: Class[T], length: Int = -1) = new SerializedField[T](relation, name, uuid, tpe, length)
   def boolean = new BooleanField(relation, name, uuid)
   def date = new DateField(relation, name, uuid)
   def time = new TimeField(relation, name, uuid)
@@ -562,6 +562,7 @@ class DefinitionHelper[R <: AnyRef](relation: Relation[R], name: String) {
   def TEXT = text
   def VARCHAR(length: Int = -1) = varchar(length)
   def VARBINARY(length: Int = -1) = varbinary(length)
+  def SERIALIZED[T](tpe: Class[T], length: Int = -1) = serialized[T](tpe, length)
   def BOOLEAN = boolean
   def DATE = date
   def TIME = time

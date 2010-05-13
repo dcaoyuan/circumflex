@@ -1,6 +1,11 @@
 package ru.circumflex.orm
 
 import ORM._
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
 import java.util.Date
 
 /**
@@ -144,6 +149,52 @@ class VarbinaryField(relation: Relation[_],
   def this(relation: Relation[_], name: String, uuid: String, length: Int = -1) =
     this(relation, name, uuid, dialect.varbinaryType + (if (length == -1) "" else "(" + length + ")"))
   def from(string: String) = string.getBytes
+}
+
+class SerializedField[T](relation: Relation[_],
+                         name: String, uuid: String, tpe: Class[T], length: Int = -1
+) extends Field[Array[Byte]](relation, name, uuid, dialect.varbinaryType + (if (length == -1) "" else "(" + length + ")")) {
+
+  override def getValue(from: AnyRef): Array[Byte] = {
+    val v = try {
+      recField match {
+        case Some(x) => x.getter.invoke(from).asInstanceOf[T]
+        case None => null.asInstanceOf[T]
+      }
+    } catch {case e: Exception => throw new RuntimeException(e)}
+    encodeValue(v)
+  }
+
+  override def setValue(to: AnyRef, value: Array[Byte]) {
+    try {
+      recField match {
+        case Some(x) =>
+          val v = decodeValue(value)
+          x.setter.invoke(to, v.asInstanceOf[AnyRef])
+        case None =>
+      }
+    } catch {case e: Exception => throw new RuntimeException(e)}
+  }
+
+
+  private def encodeValue(v: T): Array[Byte] = {
+    val baos = new ByteArrayOutputStream
+    val dos = new ObjectOutputStream(baos)
+    try {
+      dos.writeObject(v)
+    } catch {case ioe: IOException =>}
+
+    baos.toByteArray
+  }
+
+  private def decodeValue(bytes: Array[Byte]): T = {
+    val bais = new ByteArrayInputStream(bytes)
+    val dis = new ObjectInputStream(bais)
+    try {
+      dis.readObject.asInstanceOf[T]
+    } catch {case ioe: IOException => null.asInstanceOf[T]}
+  }
+
 }
 
 class BooleanField(relation: Relation[_],

@@ -47,7 +47,8 @@ object TestModel {
     }
     var name: String = _
     var country: Country = _
-    override def toString = "City(name=" + name + ")"
+    var serialized: Array[Float] = Array(1, 2, 3)
+    override def toString = "City(name=" + name + " serialized=" + (serialized mkString (",")) + ")"
   }
 
   object City extends Table[City] {
@@ -55,6 +56,7 @@ object TestModel {
     val name = "name" TEXT
     // Associations
     val country = "country_id" REFERENCES(Country) ON_DELETE CASCADE ON_UPDATE CASCADE
+    val serialized = "serialized" SERIALIZED(classOf[Array[Float]], 100)
 
     // Validations
 //  validation.notEmpty(name)
