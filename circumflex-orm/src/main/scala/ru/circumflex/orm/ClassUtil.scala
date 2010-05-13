@@ -1,8 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package ru.circumflex.orm
 
 import java.lang.reflect.Method
@@ -163,7 +158,7 @@ object ClassUtil {
       true
     } else if (clazz == classOf[String]) {
       true
-    } else false;
+    } else false
   }
 
   def getValDefs(clz: Class[_]): Array[Method] =

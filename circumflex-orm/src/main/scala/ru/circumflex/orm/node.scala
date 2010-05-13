@@ -77,8 +77,9 @@ abstract class RelationNode[R <: AnyRef] extends SQLable
    * Auto-join (the `ON` subclause is evaluated by searching matching association).
    */
   def join[J <: AnyRef](node: RelationNode[J],
-                        joinType: JoinType = LEFT_JOIN): JoinNode[R, J] =
-                          findAssociation(node) match {
+                        joinType: JoinType = LEFT_JOIN
+  ): JoinNode[R, J] =
+    findAssociation(node) match {
       case Some(a: Association[R, J]) =>  // many-to-one join
         new ManyToOneJoin[R, J](this, node, a, joinType)
       case _ => node.findAssociation(this) match {
@@ -91,8 +92,9 @@ abstract class RelationNode[R <: AnyRef] extends SQLable
     }
 
   def JOIN[J <: AnyRef](node: RelationNode[J],
-                        joinType: JoinType = LEFT_JOIN): JoinNode[R, J] =
-                          join(node, joinType)
+                        joinType: JoinType = LEFT_JOIN
+  ): JoinNode[R, J] =
+    join(node, joinType)
 
   // ### Equality and others
 
