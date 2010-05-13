@@ -8,7 +8,7 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
                                             name: String,
                                             uuid: String,
                                             val foreignRelation: Relation[F]
-) extends ValueHolder[F](name, uuid) { assoc =>
+) {
 
   protected var _initialized: Boolean = false
 
@@ -95,12 +95,31 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
       }
     }
 
-//    override def setValue(newValue: Long): this.type = {
-//      super.setValue(newValue)
-//      assoc._value = null.asInstanceOf[F]
-//      assoc._initialized = false
-//      return this
-//    }
+  }
+
+  def apply(record: R): Option[F] = {
+    if (relation.transient_?(record)) None
+    else {
+      val id = relation.idOf(record).get
+      val root = foreignRelation as "root"
+      lastAlias(root.alias)
+      val r = (SELECT (root.*) FROM (root) WHERE (foreignRelation.id EQ id)).unique
+
+      r foreach {x => tx.updateRecordCache(foreignRelation, x)}
+      r
+//      val refId = field.getValue(record)
+//      tx.getCachedRecord(foreignRelation, refId) match {  // lookup in cache
+//        case None => // lazy fetch
+//          tx.getCachedRecord(foreignRelation, refId)
+//          foreignRelation.get(refId) match {
+//            case a@Some(x) =>
+//              tx.updateRecordCache(foreignRelation, x)
+//              a
+//            case _ => None
+//          }
+//        case x => x
+//      }
+    }
   }
 }
 
