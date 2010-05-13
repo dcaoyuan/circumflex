@@ -88,23 +88,23 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
   /**
    * Execute a query and return `Seq[T]`, where `T` is designated by query projection.
    */
-  def list(): Seq[T] = resultSet(rs => {
-      val result = new ListBuffer[T]()
-      while (rs.next)
-        result += read(rs)
-      return result
-    })
+  def list(): Seq[T] = resultSet{rs =>
+    val result = new ListBuffer[T]()
+    while (rs.next)
+      result += read(rs)
+    return result
+  }
 
   /**
    * Execute a query and return a unique result.
    *
    * An exception is thrown if result set yields more than one row.
    */
-  def unique(): Option[T] = resultSet(rs => {
-      if (!rs.next) return None
-      else if (rs.isLast) return Some(read(rs))
-      else throw new ORMException("Unique result expected, but multiple rows found.")
-    })
+  def unique(): Option[T] = resultSet{rs =>
+    if (!rs.next) return None
+    else if (rs.isLast) return Some(read(rs))
+    else throw new ORMException("Unique result expected, but multiple rows found.")
+  }
 
 }
 
@@ -124,7 +124,7 @@ class NativeSQLQuery[T](projection: Projection[T],
  */
 class Select[T](projection: Projection[T]) extends SQLQuery[T](projection) {
 
-    // ### Commons
+  // ### Commons
 
   protected var _auxProjections: Seq[Projection[_]] = Nil
   protected var _relations: Seq[RelationNode[_]] = Nil
@@ -139,11 +139,12 @@ class Select[T](projection: Projection[T]) extends SQLQuery[T](projection) {
   /**
    * Query parameters.
    */
-  def parameters: Seq[Any] = _where.parameters ++
-  _having.parameters ++
-      _setOps.flatMap(p => p._2.parameters) ++
-      _orders.flatMap(_.parameters)
-
+  def parameters: Seq[Any] = (
+    _where.parameters ++
+    _having.parameters ++
+    _setOps.flatMap(p => p._2.parameters) ++
+    _orders.flatMap(_.parameters)
+  )
   /**
    * Queries combined with this subselect using specific set operation
    * (in pair, `SetOperation -> Subselect`),
@@ -327,14 +328,14 @@ trait DMLQuery extends Query {
   /**
    * Execute a query and return the number of affected rows.
    */
-  def execute(): Int = transactionManager.dml(conn => {
-      val sql = toSql
-      sqlLog.debug(sql)
-      auto(conn.prepareStatement(sql))(st => {
-          setParams(st, 1)
-          st.executeUpdate
-        })
-    })
+  def execute(): Int = transactionManager.dml{conn =>
+    val sql = toSql
+    sqlLog.debug(sql)
+    auto(conn.prepareStatement(sql)){st =>
+      setParams(st, 1)
+      st.executeUpdate
+    }
+  }
 }
 
 // ## Native DML

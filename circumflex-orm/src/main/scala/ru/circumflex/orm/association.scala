@@ -83,18 +83,30 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
     }
 
     override def setValue(to: AnyRef, id: Long) {
-      foreignRelation.recordOf(id) match {
-        case Some(record) =>
-          try {
-            recField match {
-              case Some(x) => x.setter.invoke(to, record)
-              case None =>
-            }
-          } catch {case e: Exception => throw new RuntimeException(e)}
+      val fRecord: F = foreignRelation.recordOf(id) match {
+        case Some(x) => x // referred record has been fetched
         case None =>
+          // @todo fetch right now or lazily? Should implement in one sql query?
+          // one solution is return a funtion which will be applied after all query read(rs) done
+          val root = foreignRelation as "root"
+          lastAlias(root.alias)
+          (SELECT (root.*) FROM (root) WHERE (foreignRelation.id EQ id)).unique match {
+            case Some(x) =>
+              foreignRelation.recordToId += (x -> id)
+              tx.updateRecordCache(foreignRelation, x)
+              x
+            case None => null.asInstanceOf[F]
+          }
       }
-    }
 
+      // set instance to's reference field to foreign record
+      try {
+        recField match {
+          case Some(x) => x.setter.invoke(to, fRecord)
+          case None =>
+        }
+      } catch {case e: Exception => throw new RuntimeException(e)}
+    }
   }
 
   def apply(record: R): Option[F] = {
@@ -103,22 +115,13 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
       val id = relation.idOf(record).get
       val root = foreignRelation as "root"
       lastAlias(root.alias)
-      val r = (SELECT (root.*) FROM (root) WHERE (foreignRelation.id EQ id)).unique
-
-      r foreach {x => tx.updateRecordCache(foreignRelation, x)}
-      r
-//      val refId = field.getValue(record)
-//      tx.getCachedRecord(foreignRelation, refId) match {  // lookup in cache
-//        case None => // lazy fetch
-//          tx.getCachedRecord(foreignRelation, refId)
-//          foreignRelation.get(refId) match {
-//            case a@Some(x) =>
-//              tx.updateRecordCache(foreignRelation, x)
-//              a
-//            case _ => None
-//          }
-//        case x => x
-//      }
+      (SELECT (root.*) FROM (root) WHERE (foreignRelation.id EQ id)).unique match {
+        case a@Some(x) =>
+          foreignRelation.recordToId += (x -> id)
+          tx.updateRecordCache(foreignRelation, x)
+          a
+        case None => None
+      }
     }
   }
 }

@@ -77,8 +77,7 @@ trait CompositeProjection[R] extends Projection[R] {
  * This projection represents an arbitrary expression that RDBMS can understand
  * within `SELECT` clause (for example, `current_timestamp` or `count(*)`).
  */
-class ExpressionProjection[T](val expression: String)
-extends AtomicProjection[T] {
+class ExpressionProjection[T](val expression: String) extends AtomicProjection[T] {
 
   def toSql = dialect.alias(expression, alias)
 
@@ -97,8 +96,8 @@ extends AtomicProjection[T] {
  * A projection for single field of a record.
  */
 class FieldProjection[T, R <: AnyRef](val node: RelationNode[R],
-                                      val field: Field[T])
-extends AtomicProjection[T] {
+                                      val field: Field[T]
+) extends AtomicProjection[T] {
 
   /**
    * Returns a column name qualified with node's alias.
@@ -121,8 +120,7 @@ extends AtomicProjection[T] {
 /**
  * A projection for reading entire `Record`.
  */
-class RecordProjection[R <:AnyRef](val node: RelationNode[R])
-extends CompositeProjection[R] {
+class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeProjection[R] {
   protected val _fieldProjections: Seq[FieldProjection[Any, R]] = node
   .relation
   .fields
@@ -171,15 +169,14 @@ extends CompositeProjection[R] {
 
 // ## Projections for tuples
 
-class UntypedTupleProjection(val subProjections: Projection[_]*)
-extends CompositeProjection[Array[Any]] {
+class UntypedTupleProjection(val subProjections: Projection[_]*) extends CompositeProjection[Array[Any]] {
   def read(rs: ResultSet): Array[Any] = subProjections.map(_.read(rs)).toArray
 }
 
 case class Tuple2Projection[T1, T2] (
   val _1: Projection[T1],
-  val _2: Projection[T2])
-extends CompositeProjection[Tuple2[T1, T2]] {
+  val _2: Projection[T2]
+) extends CompositeProjection[Tuple2[T1, T2]] {
   def subProjections = List[Projection[_]](_1, _2)
   def read(rs: ResultSet): Tuple2[T1, T2] =
     Tuple(_1.read(rs), _2.read(rs))
@@ -188,8 +185,8 @@ extends CompositeProjection[Tuple2[T1, T2]] {
 case class Tuple3Projection[T1, T2, T3] (
   val _1: Projection[T1],
   val _2: Projection[T2],
-  val _3: Projection[T3])
-extends CompositeProjection[Tuple3[T1, T2, T3]] {
+  val _3: Projection[T3]
+) extends CompositeProjection[Tuple3[T1, T2, T3]] {
   def subProjections = List[Projection[_]](_1, _2, _3)
   def read(rs: ResultSet): Tuple3[T1, T2, T3] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs))
@@ -199,8 +196,8 @@ case class Tuple4Projection[T1, T2, T3, T4] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
-  val _4: Projection[T4])
-extends CompositeProjection[Tuple4[T1, T2, T3, T4]] {
+  val _4: Projection[T4]
+) extends CompositeProjection[Tuple4[T1, T2, T3, T4]] {
   def subProjections = List[Projection[_]](_1, _2, _3, _4)
   def read(rs: ResultSet): Tuple4[T1, T2, T3, T4] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs))
@@ -211,8 +208,8 @@ case class Tuple5Projection[T1, T2, T3, T4, T5] (
   val _2: Projection[T2],
   val _3: Projection[T3],
   val _4: Projection[T4],
-  val _5: Projection[T5])
-extends CompositeProjection[Tuple5[T1, T2, T3, T4, T5]] {
+  val _5: Projection[T5]
+) extends CompositeProjection[Tuple5[T1, T2, T3, T4, T5]] {
   def subProjections = List[Projection[_]](_1, _2, _3, _4, _5)
   def read(rs: ResultSet): Tuple5[T1, T2, T3, T4, T5] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs), _5.read(rs))
@@ -224,8 +221,8 @@ case class Tuple6Projection[T1, T2, T3, T4, T5, T6] (
   val _3: Projection[T3],
   val _4: Projection[T4],
   val _5: Projection[T5],
-  val _6: Projection[T6])
-extends CompositeProjection[Tuple6[T1, T2, T3, T4, T5, T6]] {
+  val _6: Projection[T6]
+) extends CompositeProjection[Tuple6[T1, T2, T3, T4, T5, T6]] {
   def subProjections = List[Projection[_]](_1, _2, _3, _4, _5, _6)
   def read(rs: ResultSet): Tuple6[T1, T2, T3, T4, T5, T6] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs), _5.read(rs),
@@ -239,8 +236,8 @@ case class Tuple7Projection[T1, T2, T3, T4, T5, T6, T7] (
   val _4: Projection[T4],
   val _5: Projection[T5],
   val _6: Projection[T6],
-  val _7: Projection[T7])
-extends CompositeProjection[Tuple7[T1, T2, T3, T4, T5, T6, T7]] {
+  val _7: Projection[T7]
+) extends CompositeProjection[Tuple7[T1, T2, T3, T4, T5, T6, T7]] {
   def subProjections = List[Projection[_]](_1, _2, _3, _4, _5, _6, _7)
   def read(rs: ResultSet): Tuple7[T1, T2, T3, T4, T5, T6, T7] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs), _5.read(rs),
@@ -255,8 +252,8 @@ case class Tuple8Projection[T1, T2, T3, T4, T5, T6, T7, T8] (
   val _5: Projection[T5],
   val _6: Projection[T6],
   val _7: Projection[T7],
-  val _8: Projection[T8])
-extends CompositeProjection[Tuple8[T1, T2, T3, T4, T5, T6, T7, T8]] {
+  val _8: Projection[T8]
+) extends CompositeProjection[Tuple8[T1, T2, T3, T4, T5, T6, T7, T8]] {
   def subProjections = List[Projection[_]](_1, _2, _3, _4, _5, _6, _7, _8)
   def read(rs: ResultSet): Tuple8[T1, T2, T3, T4, T5, T6, T7, T8] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs), _5.read(rs),
@@ -272,8 +269,8 @@ case class Tuple9Projection[T1, T2, T3, T4, T5, T6, T7, T8, T9] (
   val _6: Projection[T6],
   val _7: Projection[T7],
   val _8: Projection[T8],
-  val _9: Projection[T9])
-extends CompositeProjection[Tuple9[T1, T2, T3, T4, T5, T6, T7, T8, T9]] {
+  val _9: Projection[T9]
+) extends CompositeProjection[Tuple9[T1, T2, T3, T4, T5, T6, T7, T8, T9]] {
   def subProjections = List[Projection[_]](_1, _2, _3, _4, _5, _6, _7, _8, _9)
   def read(rs: ResultSet): Tuple9[T1, T2, T3, T4, T5, T6, T7, T8, T9] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs), _5.read(rs),
@@ -290,8 +287,8 @@ case class Tuple10Projection[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10] (
   val _7: Projection[T7],
   val _8: Projection[T8],
   val _9: Projection[T9],
-  val _10: Projection[T10])
-extends CompositeProjection[Tuple10[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10]] {
+  val _10: Projection[T10]
+) extends CompositeProjection[Tuple10[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10]] {
   def subProjections = List[Projection[_]](_1, _2, _3, _4, _5, _6, _7, _8, _9, _10)
   def read(rs: ResultSet): Tuple10[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10] =
     Tuple(_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs), _5.read(rs),

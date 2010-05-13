@@ -113,16 +113,16 @@ object TestModel {
 
   def selects = {
     val co = Country as "co"
+    val ca = Capital as "ca"
     val ci = City as "ci"
     // Select countries with corresponding cities:
-    val s1 = SELECT (co.*, ci.*) FROM (co JOIN ci) list // Seq[(Country, City)]
+    val s1 = SELECT (co.*, ca.*) FROM (co JOIN ca) list // Seq[(Country, City)]
 
     var country1: Country = null
-    s1 foreach {case (country, city) =>
-        println("country of city" + city + " is " + city.country)
-        println(country)
+    s1 foreach {case (country, capital) =>
+        println("capital " + capital + "'s country" + " is " + capital.country)
+        println("country " + country + "'s capital" + " is " + country.capital)
         country1 = country
-        println(city)
     }
 
 
