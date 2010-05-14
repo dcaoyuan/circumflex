@@ -92,7 +92,14 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
     val result = new ListBuffer[T]()
     while (rs.next)
       result += read(rs)
-    return result
+
+    // alway perform lazyFetchers after rs is processed completely to avoid nested sql query
+    projection match {
+      case x: CompositeProjection[_] => x.applyLazyFetchers
+      case _ =>
+    }
+
+    result
   }
 
   /**
@@ -101,8 +108,18 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
    * An exception is thrown if result set yields more than one row.
    */
   def unique(): Option[T] = resultSet{rs =>
-    if (!rs.next) return None
-    else if (rs.isLast) return Some(read(rs))
+    if (!rs.next) None
+    else if (rs.isLast) {
+      val record = read(rs)
+      
+      // alway perform lazyFetchers after rs is processed completely to avoid nested sql query
+      projection match {
+        case x: CompositeProjection[_] => x.applyLazyFetchers
+        case _ =>
+      }
+
+      Some(record)
+    }
     else throw new ORMException("Unique result expected, but multiple rows found.")
   }
 

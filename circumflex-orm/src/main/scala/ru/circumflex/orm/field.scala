@@ -70,13 +70,14 @@ class Field[T](val relation: Relation[_],
     } catch {case e: Exception => throw new RuntimeException(e)}
   }
 
-  def setValue(to: AnyRef, value: T) {
+  def setValue(to: AnyRef, value: T): Option[() => Unit] = {
     try {
       recField match {
         case Some(x) =>
           //val o1 = Utils.convert(v, classField.getType)
           x.setter.invoke(to, value.asInstanceOf[AnyRef]) // @todo, T is any
-        case None =>
+          None
+        case None => None
       }
     } catch {case e: Exception => throw new RuntimeException(e)}
   }
@@ -165,13 +166,14 @@ class SerializedField[T](relation: Relation[_],
     encodeValue(v)
   }
 
-  override def setValue(to: AnyRef, value: Array[Byte]) {
+  override def setValue(to: AnyRef, value: Array[Byte]) = {
     try {
       recField match {
         case Some(x) =>
           val v = decodeValue(value)
           x.setter.invoke(to, v.asInstanceOf[AnyRef])
-        case None =>
+          None
+        case None => None
       }
     } catch {case e: Exception => throw new RuntimeException(e)}
   }

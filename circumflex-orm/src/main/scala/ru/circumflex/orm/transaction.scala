@@ -162,10 +162,11 @@ class StatefulTransaction {
    * Close the underlying connection and dispose of any resources associated with this
    * transaction.
    */
-  def close(): Unit =
+  def close(): Unit = {
     if (!live_?) return
-  else connection.close()
-
+    else connection.close()
+  }
+  
   // ### Database communication methods
 
   // In order to ensure that cache is synchronized with transaction we must use these methods
@@ -217,10 +218,11 @@ class StatefulTransaction {
     recordCache.get(key(relation, id)).asInstanceOf[Option[R]]
 
   def updateRecordCache[R <: AnyRef](relation: Relation[R], record: R): Unit =
-    if (relation.transient_?(record))
+    if (relation.transient_?(record)){
       throw new ORMException("Transient records cannot be cached.")
-  else
-    recordCache += key(relation, relation.idOf(record).get) -> record
+    } else {
+      recordCache += key(relation, relation.idOf(record).get) -> record
+    }
 
   def evictRecordCache[R <: AnyRef](relation: Relation[R], record: R): Unit =
     if (!relation.transient_?(record))
@@ -229,31 +231,36 @@ class StatefulTransaction {
   def getCachedInverse[P <: AnyRef, C <: AnyRef](record: P,
                                                  association: Association[C, P]
   ): Seq[C] =
-    if (association.foreignRelation.transient_?(record))
+    if (association.foreignRelation.transient_?(record)){
       throw new ORMException("Could not retrieve inverse association for transient record.")
-  else inverseCache.get(key(association.foreignRelation, association.foreignRelation.idOf(record).get, association))
-  .getOrElse(null)
-  .asInstanceOf[Seq[C]]
+    } else {
+      inverseCache.get(key(association.foreignRelation, association.foreignRelation.idOf(record).get, association))
+      .getOrElse(null)
+      .asInstanceOf[Seq[C]]
+    }
 
   def getCachedInverse[P <: AnyRef, C <: AnyRef](record: P, inverse: InverseAssociation[P, C]): Seq[C] =
     getCachedInverse(record, inverse.association)
 
   def updateInverseCache[P <: AnyRef, C <: AnyRef](record: P,
                                                    association: Association[C, P],
-                                                   children: Seq[C]): Unit =
-                                                     if (association.foreignRelation.transient_?(record))
-                                                       throw new ORMException("Could not update inverse association cache for transient record.")
-  else inverseCache += key(association.foreignRelation, association.foreignRelation.idOf(record).get, association) -> children
+                                                   children: Seq[C]
+  ): Unit =
+    if (association.foreignRelation.transient_?(record)) {
+      throw new ORMException("Could not update inverse association cache for transient record.")
+    } else inverseCache += key(association.foreignRelation, association.foreignRelation.idOf(record).get, association) -> children
 
   def updateInverseCache[P <: AnyRef, C <: AnyRef](record: P, inverse: InverseAssociation[P, C],
-                                                   children: Seq[C]): Unit =
-                                                     updateInverseCache(record, inverse.association, children)
+                                                   children: Seq[C]
+  ): Unit =
+    updateInverseCache(record, inverse.association, children)
 
   def evictInverseCache[P <: AnyRef, C <: AnyRef](record: P,
-                                                  association: Association[C, P]): Unit =
-                                                    if (association.foreignRelation.transient_?(record))
-                                                      throw new ORMException("Could not evict inverse association cache for transient record.")
-  else inverseCache -= key(association.foreignRelation, association.foreignRelation.idOf(record).get, association)
+                                                  association: Association[C, P]
+  ): Unit =
+    if (association.foreignRelation.transient_?(record)) {
+      throw new ORMException("Could not evict inverse association cache for transient record.")
+    } else inverseCache -= key(association.foreignRelation, association.foreignRelation.idOf(record).get, association)
 
   def evictInverseCache[P <: AnyRef, C <: AnyRef](record: P, inverse: InverseAssociation[P, C]): Unit =
     evictInverseCache(record, inverse.association)

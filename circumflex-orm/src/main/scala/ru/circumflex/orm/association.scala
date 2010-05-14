@@ -7,7 +7,8 @@ import ORM._
 class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
                                             name: String,
                                             uuid: String,
-                                            val foreignRelation: Relation[F]
+                                            val foreignRelation: Relation[F],
+                                            prefetch_? : Boolean = false
 ) {
 
   protected var _initialized: Boolean = false
@@ -82,23 +83,30 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
       } catch {case e: Exception => throw new RuntimeException(e)}
     }
 
-    override def setValue(to: AnyRef, id: Long) {
-      val fRecord: F = foreignRelation.recordOf(id) match {
-        case Some(x) => x // referred record has been fetched
-        case None =>
-          // @todo fetch right now or lazily? Should implement in one sql query?
-          // one solution is return a funtion which will be applied after all query read(rs) done
-          val root = foreignRelation
-          (SELECT (root.*) FROM (root) WHERE (root.id EQ id)).unique match {
-            case Some(x) =>
-              foreignRelation.recordToId += (x -> id)
-              tx.updateRecordCache(foreignRelation, x)
-              x
-            case None => null.asInstanceOf[F]
-          }
-      }
+    override def setValue(to: AnyRef, id: Long): Option[() => Unit] = {
+      if (id == -1) return None
 
-      // set instance to's reference field to foreign record
+      foreignRelation.recordOf(id) match {
+        case Some(fRecord) => // referred record has been fetched
+          _setValue(to, fRecord)
+          None
+
+        case None =>
+          // return a lazy fetcher so the foreign record may has been ready after all query's read(rs) done
+          val lazyFetcher = {() =>
+            foreignRelation.recordOf(id) match {
+              case Some(fRecord) => // referred record has been fetched
+                _setValue(to, fRecord)
+              case None =>
+            }
+            ()
+          }
+          Some(lazyFetcher)
+      }
+    }
+
+    // set instance to's reference field to foreign record
+    def _setValue(to: AnyRef, fRecord: F) {
       try {
         recField match {
           case Some(x) => x.setter.invoke(to, fRecord)
@@ -111,13 +119,13 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
   def apply(record: R): Option[F] = {
     if (relation.transient_?(record)) None
     else {
-      val id = relation.idOf(record).get
+      val id = relation.idOf(record)
       val root = foreignRelation
-      (SELECT (root.*) FROM (root) WHERE (root.id EQ id)).unique match {
-        case a@Some(x) =>
-          foreignRelation.recordToId += (x -> id)
-          tx.updateRecordCache(foreignRelation, x)
-          a
+      (SELECT (root.*) FROM (relation JOIN root) WHERE (field EQ id)).unique match {
+        case Some(fRecord) =>
+          tx.updateRecordCache(foreignRelation, fRecord)
+          field._setValue(record, fRecord)
+          Some(fRecord)
         case None => None
       }
     }
