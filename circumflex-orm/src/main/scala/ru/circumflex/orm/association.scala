@@ -85,24 +85,17 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
 
     override def setValue(to: AnyRef, id: Long): Option[() => Unit] = {
       if (id == -1) return None
-
-      foreignRelation.recordOf(id) match {
-        case Some(fRecord) => // referred record has been fetched
-          _setValue(to, fRecord)
-          None
-
-        case None =>
-          // return a lazy fetcher so the foreign record may has been ready after all query's read(rs) done
-          val lazyFetcher = {() =>
-            foreignRelation.recordOf(id) match {
-              case Some(fRecord) => // referred record has been fetched
-                _setValue(to, fRecord)
-              case None =>
-            }
-            ()
-          }
-          Some(lazyFetcher)
+      
+      // return a lazy fetcher so the foreign record may has been ready after all query's read(rs) done
+      val lazyFetcher = {() =>
+        foreignRelation.recordOf(id) match {
+          case Some(fRecord) => _setValue(to, fRecord)
+          case None =>
+        }
+        ()
       }
+      
+      Some(lazyFetcher)
     }
 
     // set instance to's reference field to foreign record

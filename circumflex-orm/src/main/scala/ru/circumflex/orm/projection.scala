@@ -2,12 +2,13 @@ package ru.circumflex.orm
 
 import ORM._
 import java.sql.ResultSet
-import scala.collection.mutable.ListBuffer
 
 // ## Projection Basics
 
 trait Projection[T] extends SQLable {
 
+  var query: SQLQuery[_] = _
+  
   /**
    * Extract a value from result set.
    */
@@ -52,17 +53,6 @@ trait CompositeProjection[R] extends Projection[R] {
   private var _hash = 0
 
   val subProjections: Seq[Projection[_]]
-
-  protected[orm] val lazyFetchers = ListBuffer[() => Unit]()
-
-  protected[orm] def applyLazyFetchers: Unit = {
-    subProjections foreach {
-      case x: CompositeProjection[_] => x.applyLazyFetchers
-      case _ =>
-    }
-    lazyFetchers foreach (_.apply())
-    lazyFetchers.clear
-  }
 
   def sqlAliases = subProjections.flatMap(_.sqlAliases)
 
@@ -149,8 +139,8 @@ class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeP
     _fieldProjections.find(_.field == node.relation.primaryKey) match {
       case Some(pkProjection) => pkProjection.read(rs) match {
           case id: Long =>
-            // always re-read record here, even this record has been cached,
-            // but the reference column may not bet set yet.
+            // Always re-read record here.
+            // Even this record has been cached, the reference column may still not be set yet.
             readRecord(rs)
         } case _ => nope
     }
@@ -162,8 +152,8 @@ class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeP
         node.relation.recordToId += (record -> p.read(rs).asInstanceOf[Long])
       case p =>
         p.field.setValue(record, p.read(rs).asInstanceOf[AnyRef]) match {
-          case Some(lazyAction) => lazyFetchers += lazyAction
-          case _ =>
+          case Some(lazyAction) => query.lazyFetchers += lazyAction
+          case None =>
         }
     }
     // If record remains unidentified, do not return it.

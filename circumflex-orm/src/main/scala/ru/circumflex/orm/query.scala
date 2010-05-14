@@ -11,7 +11,7 @@ import collection.mutable.ListBuffer
  * The most common contract for queries.
  */
 trait Query extends SQLable with ParameterizedExpression {
-  protected var aliasCounter = 0;
+  protected var aliasCounter = 0
 
   /**
    * Generate an alias to eliminate duplicates within query.
@@ -27,12 +27,12 @@ trait Query extends SQLable with ParameterizedExpression {
    * index of prepared statement parameter.
    */
   def setParams(st: PreparedStatement, startIndex: Int): Int = {
-    var paramsCounter = startIndex;
-    parameters.foreach(p => {
-        typeConverter.write(st, p, paramsCounter)
-        paramsCounter += 1
-      })
-    return paramsCounter
+    var paramsCounter = startIndex
+    parameters foreach {p =>
+      typeConverter.write(st, p, paramsCounter)
+      paramsCounter += 1
+    }
+    paramsCounter
   }
 
   override def toString = toSql
@@ -69,15 +69,41 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
 
   // ### Data Retrieval Stuff
 
+  protected[orm] val lazyFetchers = ListBuffer[() => Unit]()
+
+  private def applyLazyFetchers {
+    lazyFetchers foreach (_.apply())
+    lazyFetchers.clear
+  }
+
+  private def setProjectionQuery(projection: Projection[_]) {
+    projection.query = this
+    projection match {
+      case x: CompositeProjection[_] => x.subProjections foreach setProjectionQuery
+      case _ =>
+    }
+  }
+
   /**
    * Execute a query, open a JDBC `ResultSet` and executes specified `actions`.
    */
-  def resultSet[A](actions: ResultSet => A): A = transactionManager.sql(toSql){st =>
-    sqlLog.debug(toSql)
-    setParams(st, 1)
-    auto(st.executeQuery)(actions)
-  }
+  def resultSet[A](actions: ResultSet => A): A = {
+    val sql = toSql
+    sqlLog.debug(sql)
 
+    projections foreach setProjectionQuery
+    
+    val result = transactionManager.sql(sql){st =>
+      setParams(st, 1)
+      auto(st.executeQuery)(actions)
+    }
+
+    // alway perform lazyFetchers after rs is processed completely to avoid nested sql query
+    applyLazyFetchers
+
+    result
+  }
+  
   // ### Executors
 
   /**
@@ -90,15 +116,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
    */
   def list(): Seq[T] = resultSet{rs =>
     val result = new ListBuffer[T]()
-    while (rs.next)
-      result += read(rs)
-
-    // alway perform lazyFetchers after rs is processed completely to avoid nested sql query
-    projection match {
-      case x: CompositeProjection[_] => x.applyLazyFetchers
-      case _ =>
-    }
-
+    while (rs.next) result += read(rs)
     result
   }
 
@@ -109,17 +127,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
    */
   def unique(): Option[T] = resultSet{rs =>
     if (!rs.next) None
-    else if (rs.isLast) {
-      val record = read(rs)
-      
-      // alway perform lazyFetchers after rs is processed completely to avoid nested sql query
-      projection match {
-        case x: CompositeProjection[_] => x.applyLazyFetchers
-        case _ =>
-      }
-
-      Some(record)
-    }
+    else if (rs.isLast) Some(read(rs))
     else throw new ORMException("Unique result expected, but multiple rows found.")
   }
 

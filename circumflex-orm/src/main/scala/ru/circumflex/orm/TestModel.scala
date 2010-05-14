@@ -22,13 +22,13 @@ object TestModel {
     override def toString = "Country(name=" + name + ", code=" + code + ")"
   }
 
-  object Country extends Table[Country] {
+  object Countries extends Table[Country] {
     val code = "code" VARCHAR(2) DEFAULT("'ch'")
     val name = "name" TEXT
-    val capital = "capital_id" REFERENCES(Capital)
+    val capital = "capital_id" REFERENCES(Capitals)
 
     // Inverse associations, should be def or lazy val
-    def cities = inverse(City.country)
+    def cities = inverse(Cities.country)
 
     INDEX("country_code_idx", "LOWER(code)") USING "btree" UNIQUE
 
@@ -51,11 +51,11 @@ object TestModel {
     override def toString = "City(name=" + name + " serialized=" + (serialized mkString (",")) + ")"
   }
 
-  object City extends Table[City] {
+  object Cities extends Table[City] {
     // Fields
     val name = "name" TEXT
     // Associations
-    val country = "country_id" REFERENCES(Country) ON_DELETE CASCADE ON_UPDATE CASCADE
+    val country = "country_id" REFERENCES(Countries) ON_DELETE CASCADE ON_UPDATE CASCADE
     val serialized = "serialized" SERIALIZED(classOf[Array[Float]], 100)
 
     // Validations
@@ -76,10 +76,10 @@ object TestModel {
     override def toString = "Capital(country=" + country.name + ", name=" + city.name + ")"
   }
 
-  object Capital extends Table[Capital] {
+  object Capitals extends Table[Capital] {
     // Associations
-    val country = "country_id" REFERENCES(Country) ON_DELETE CASCADE
-    val city = "city_id" REFERENCES(City) ON_DELETE RESTRICT
+    val country = "countries_id" REFERENCES(Countries) ON_DELETE CASCADE
+    val city = "cities_id" REFERENCES(Cities) ON_DELETE RESTRICT
     UNIQUE (country)
     UNIQUE (city)
   }
@@ -91,30 +91,30 @@ object TestModel {
     selects
   }
 
-  def schema = new DDLUnit(City, Capital, Country).dropCreate.messages.foreach(msg => println(msg.body))
+  def schema = new DDLUnit(Cities, Capitals, Countries).dropCreate.messages.foreach(msg => println(msg.body))
 
   def inserts = {
     val country = new Country("ru", "russian")
-    Country.save(country)
-    println(Country.idOf(country) + " " + country)
+    Countries.save(country)
+    println(Countries.idOf(country) + " " + country)
 
     val city = new City(country, "mossco")
-    City.save(city)
-    City.save(new City(country, "abc"))
-    City.save(new City(country, "def"))
+    Cities.save(city)
+    Cities.save(new City(country, "abc"))
+    Cities.save(new City(country, "def"))
     
     val capital = new Capital(country, city)
-    Capital.save(capital)
+    Capitals.save(capital)
     country.capital = capital
-    Country.save(country)
+    Countries.save(country)
 
-    println(Country.idOf(country) + " " + country)
+    println(Countries.idOf(country) + " " + country)
   }
 
   def selects = {
-    val co = Country
-    val ca = Capital 
-    val ci = City 
+    val co = Countries
+    val ca = Capitals
+    val ci = Cities
     // Select countries with corresponding cities:
     val s1 = SELECT (co.*, ca.*) FROM (co JOIN ca) list // Seq[(Country, City)]
 
@@ -134,7 +134,7 @@ object TestModel {
     val s3 = SELECT (ci.*) FROM (ci JOIN co) WHERE (co.code LIKE "ru") ORDER_BY (ci.name ASC) list  // Seq[City]
     //val s4 = SELECT (City.*) FROM (City JOIN Country) WHERE (Country.code LIKE "ru") ORDER_BY (City.name ASC) list  // Seq[City]
 
-    country1.cities ++= Country.cities(country1)
+    country1.cities ++= Countries.cities(country1)
     country1.cities foreach println
   }
   

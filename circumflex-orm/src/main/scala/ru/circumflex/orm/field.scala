@@ -16,7 +16,6 @@ class Field[T](val relation: Relation[_],
                val uuid: String,
                val sqlType: String
 ) extends SQLable {
-  /* extends ValueHolder[T](name, uuid) */
 
   // Should the `UNIQUE` constraint be generated for this field?
   protected var _unique: Boolean = false
@@ -81,6 +80,8 @@ class Field[T](val relation: Relation[_],
       }
     } catch {case e: Exception => throw new RuntimeException(e)}
   }
+
+  override def toString = name
 }
 
 class PrimaryKeyField(relation: Relation[_]
