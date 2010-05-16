@@ -56,7 +56,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
 
   // @todo, when to clear it or use weak reference one?
-  private val idToRecord = HashBiMap.create[Long, R]
+  private var idToRecord = HashBiMap.create[Long, R]
 
   protected[orm] var _fields: Seq[Field[_]] = ListBuffer()
   protected[orm] var _associations: Seq[Association[R, _]] = ListBuffer()
@@ -169,7 +169,8 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def recordOf(id: Long): Option[R] = Option(idToRecord.get(id))
   def updateCache(id: Long, record: R) = idToRecord.put(id, record)
   def evictCache(id: Long) = idToRecord.remove(id)
-  def evictCache(record: R) = idToRecord.inverse.remove(id)
+  def evictCache(record: R) = idToRecord.inverse.remove(record)
+  def invalideCaches {idToRecord = HashBiMap.create[Long, R]}
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
