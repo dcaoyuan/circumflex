@@ -149,7 +149,7 @@ class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeP
     val record: R = node.relation.recordClass.newInstance
     _fieldProjections foreach {
       case p if p.field == node.relation.primaryKey =>
-        node.relation.recordToId += (record -> p.read(rs).asInstanceOf[Long])
+        node.relation.updateCache(p.read(rs).asInstanceOf[Long], record)
       case p =>
         p.field.setValue(record, p.read(rs).asInstanceOf[AnyRef]) match {
           case Some(lazyAction) => query.lazyFetchers += lazyAction

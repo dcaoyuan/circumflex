@@ -5,9 +5,9 @@ import JDBC._
 import java.sql.Statement
 import ru.circumflex.core.Circumflex
 import ru.circumflex.core.CircumflexUtil._
+import com.google.common.collect.HashBiMap
 import java.sql.PreparedStatement
 import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.WeakHashMap
 
 // ## Relations registry
 
@@ -55,7 +55,8 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   private val recordSample: R = recordClass.newInstance
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
 
-  val recordToId = new WeakHashMap[R, Long]
+  // @todo, when to clear it or use weak reference one?
+  private val idToRecord = HashBiMap.create[Long, R]
 
   protected[orm] var _fields: Seq[Field[_]] = ListBuffer()
   protected[orm] var _associations: Seq[Association[R, _]] = ListBuffer()
@@ -164,18 +165,21 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    */
   def readOnly_? : Boolean = false
 
-  def idOf(record: R): Option[Long] = recordToId.get(record)
-  def recordOf(id: Long): Option[R] = recordToId find {x => x._2 == id} map (_._1)
+  def idOf(record: R): Option[Long] = Option(idToRecord.inverse.get(record))
+  def recordOf(id: Long): Option[R] = Option(idToRecord.get(id))
+  def updateCache(id: Long, record: R) = idToRecord.put(id, record)
+  def evictCache(id: Long) = idToRecord.remove(id)
+  def evictCache(record: R) = idToRecord.inverse.remove(id)
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
    */
-  def transient_?(record: R): Boolean = recordToId.get(record).isEmpty
+  def transient_?(record: R): Boolean = !idToRecord.inverse.containsKey(record)
 
   /**
    * Create new `RelationNode` with specified `alias`.
    */
-  @deprecated("It's better not use alias, use relation name direclty")
+  @deprecated("It's better not use alias, use relation name directly")
   def as(alias: String) = (new RelationNode[R] {
       /**
        * The following code will cause the node.relation returning the actul type
@@ -347,7 +351,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
       if (rows > 0 && keys.next) {
         val latestId = keys.getLong(1)
         // refresh latestId for this record
-        recordToId += (record -> latestId)
+        updateCache(latestId, record)
       }
       rows
     }
@@ -390,7 +394,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
             count += 1
             if (latestId > 0) {
               // refresh latestId for this record
-              recordToId += (records(i) -> latestId)
+              updateCache(latestId, records(i))
               latestId -= 1
             }
           }
