@@ -24,12 +24,12 @@ class Dialect {
 
   def longType = "BIGINT"
   def integerType = "INTEGER"
-  def floatType = "FLOAT"
-  def doubleType = "DOUBLE"
-  def numericType = "NUMERIC"
+  def floatType  (precision: Int = -1, scale: Int = 0) = "FLOAT"   + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
+  def doubleType (precision: Int = -1, scale: Int = 0) = "DOUBLE"  + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
+  def numericType(precision: Int = -1, scale: Int = 0) = "NUMERIC" + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
   def textType = "TEXT"
-  def varcharType = "VARCHAR"
-  def varbinaryType = "VARBINARY"
+  def varcharType  (length: Int = -1) = "VARCHAR"   + (if (length == -1) "" else "(" + length + ")")
+  def varbinaryType(length: Int = -1) = "VARBINARY" + (if (length == -1) "" else "(" + length + ")")
   def booleanType = "BOOLEAN"
   def dateType = "DATE"
   def timeType = "TIME"
@@ -190,7 +190,7 @@ class Dialect {
   /**
    * Produce `DROP SCHEMA` statement.
    */
-  def dropSchema(schema: Schema) = "DROP SCHEMA " + schema.name
+  def dropSchema(schema: Schema) = "DROP SCHEMA IF EXISTS " + schema.name
 
   /**
    * Produce `CREATE TABLE` statement without constraints.
@@ -204,7 +204,7 @@ class Dialect {
    * Produce `DROP TABLE` statement.
    */
   def dropTable(table: Table[_]) =
-    "DROP TABLE " + table.qualifiedName
+    "DROP TABLE IF EXISTS " + table.qualifiedName
 
   /**
    * Produces `CREATE VIEW` statement.
@@ -218,25 +218,22 @@ class Dialect {
    * Produce `DROP VIEW` statement.
    */
   def dropView(view: View[_]) =
-    "DROP VIEW " + view.qualifiedName
+    "DROP VIEW IF EXISTS " + view.qualifiedName
 
   /**
    * Produce `CREATE INDEX` statement.
    */
   def createIndex(idx: Index): String = {
-    var result = "CREATE "
-    if (idx.unique_?) result += "UNIQUE "
-    result += "INDEX " + idx.name + " ON " + idx.relation.qualifiedName +
-    " USING " + idx.using + " (" + idx.expression + ")"
-    if (idx.where != EmptyPredicate)
-      result += " WHERE " + idx.where.toInlineSql
-    return result
+    "CREATE " + (if (idx.unique_?) "UNIQUE " else "") +
+    "INDEX " + idx.name + " ON " + idx.relation.qualifiedName + " (" + idx.expression + ")"
+    " USING " + idx.using +
+    (if (idx.where != EmptyPredicate) " WHERE " + idx.where.toInlineSql else "")
   }
 
   /**
    * Produce `DROP INDEX` statement.
    */
-  def dropIndex(idx: Index) = "DROP INDEX " + idx.relation.schema.name + "." + idx.name
+  def dropIndex(idx: Index) = "DROP INDEX IF EXISTS " + idx.relation.schema.name + "." + idx.name
 
   /**
    * SQL definition for a column represented by specified `field`

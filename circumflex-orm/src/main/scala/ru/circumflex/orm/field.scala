@@ -113,7 +113,7 @@ class FloatField(relation: Relation[_],
   relation,
   name,
   uuid,
-  dialect.floatType + (if (precision == -1) "" else "(" + precision + "," + scale + ")")) {
+  dialect.floatType(precision, scale)) {
   def from(string: String) = string.toFloat
 }
 
@@ -123,7 +123,7 @@ class DoubleField(relation: Relation[_],
   relation,
   name,
   uuid,
-  dialect.doubleType + (if (precision == -1) "" else "(" + precision + "," + scale + ")")) {
+  dialect.doubleType(precision, scale)) {
   def from(string: String) = string.toDouble
 }
 
@@ -133,7 +133,7 @@ class NumericField(relation: Relation[_],
   relation,
   name,
   uuid,
-  dialect.numericType + (if (precision == -1) "" else "(" + precision + "," + scale + ")")) {
+  dialect.numericType(precision, scale)) {
   def from(string: String) = string.toDouble
 }
 
@@ -141,7 +141,7 @@ class TextField(relation: Relation[_],
                 name: String, uuid: String, sqlType: String
 ) extends XmlSerializableField[String](relation, name, uuid, sqlType) {
   def this(relation: Relation[_], name: String, uuid: String, length: Int = -1) =
-    this(relation, name, uuid, dialect.varcharType + (if (length == -1) "" else "(" + length + ")"))
+    this(relation, name, uuid, dialect.varcharType(length))
   def from(string: String) = string
 }
 
@@ -149,13 +149,13 @@ class VarbinaryField(relation: Relation[_],
                      name: String, uuid: String, sqlType: String
 ) extends XmlSerializableField[Array[Byte]](relation, name, uuid, sqlType) {
   def this(relation: Relation[_], name: String, uuid: String, length: Int = -1) =
-    this(relation, name, uuid, dialect.varbinaryType + (if (length == -1) "" else "(" + length + ")"))
+    this(relation, name, uuid, dialect.varbinaryType(length))
   def from(string: String) = string.getBytes
 }
 
 class SerializedField[T](relation: Relation[_],
                          name: String, uuid: String, tpe: Class[T], length: Int = -1
-) extends Field[Array[Byte]](relation, name, uuid, dialect.varbinaryType + (if (length == -1) "" else "(" + length + ")")) {
+) extends Field[Array[Byte]](relation, name, uuid, dialect.varbinaryType(length)) {
 
   override def getValue(from: AnyRef): Array[Byte] = {
     val v = try {

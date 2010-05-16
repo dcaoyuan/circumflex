@@ -40,3 +40,16 @@ class OracleDialect extends Dialect {
     relation.addPostAux(trig)
   }
 }
+
+class H2Dialect extends Dialect {
+  override def textType = "VARCHAR(4096)"
+  override def timestampType = "TIMESTAMP"
+  override def primaryKeyExpression(relation: Relation[_]) = "AUTO_INCREMENT"
+  override def floatType (precision: Int = -1, scale: Int = 0) = "FLOAT"
+  override def doubleType(precision: Int = -1, scale: Int = 0) = "DOUBLE"
+  override def createIndex(idx: Index): String = {
+    "CREATE " + (if (idx.unique_?) "UNIQUE " else "") +
+    "INDEX " + idx.name + " ON " + idx.relation.qualifiedName + " (" + idx.expression + ")"
+  }
+}
+
