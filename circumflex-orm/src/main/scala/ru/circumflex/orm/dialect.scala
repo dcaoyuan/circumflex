@@ -225,7 +225,7 @@ class Dialect {
    */
   def createIndex(idx: Index): String = {
     "CREATE " + (if (idx.unique_?) "UNIQUE " else "") +
-    "INDEX " + idx.name + " ON " + idx.relation.qualifiedName + " (" + idx.expression + ")"
+    "INDEX " + idx.name + " ON " + idx.relation.qualifiedName + " (" + idx.expression + ")" +
     " USING " + idx.using +
     (if (idx.where != EmptyPredicate) " WHERE " + idx.where.toInlineSql else "")
   }
