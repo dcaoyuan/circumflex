@@ -86,12 +86,15 @@ class DDLUnit {
   // ### Workers
 
   protected def dropObjects(objects: Seq[SchemaObject], conn: Connection) =
-    for (o <- objects.reverse)
+    for (o <- objects.reverse) {
+      if (o.isInstanceOf[Relation[_]]) o.asInstanceOf[Relation[_]].invalideCaches
+      
       autoClose(conn.prepareStatement(o.sqlDrop))(st => {
         st.executeUpdate
         _msgs ++= List(InfoMsg("DROP "  + o.objectName + ": OK", o.sqlDrop))
       })(e =>
       _msgs ++= List(ErrorMsg("DROP " + o.objectName + ": " + e.getMessage, o.sqlDrop)))
+    }
 
   protected def createObjects(objects: Seq[SchemaObject], conn: Connection) =
     for (o <- objects) {
