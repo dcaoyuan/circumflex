@@ -139,14 +139,16 @@ class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeP
     _fieldProjections.find(_.field == node.relation.primaryKey) match {
       case Some(pkProjection) => pkProjection.read(rs) match {
           case id: Long =>
-            // Always re-read record here.
-            // Even this record has been cached, the reference column may still not be set yet.
-            readRecord(rs)
+            // Has this record been cached, if true, should use and update it via rs
+            val record: R = node.relation.recordOf(id) match {
+              case Some(x) => x
+              case None => node.relation.recordClass.newInstance
+            }
+            readRecord(rs, record)
         } case _ => nope
     }
 
-  protected def readRecord(rs: ResultSet): R = {
-    val record: R = node.relation.recordClass.newInstance
+  protected def readRecord(rs: ResultSet, record: R): R = {
     _fieldProjections foreach {
       case p if p.field == node.relation.primaryKey =>
         node.relation.updateCache(p.read(rs).asInstanceOf[Long], record)
