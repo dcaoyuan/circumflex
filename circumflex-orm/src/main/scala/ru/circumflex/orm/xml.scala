@@ -56,7 +56,7 @@ class Deployment(val id: String,
     // If we are still here, let's process the record further: set parents, attributes, subelements
     // and foreigners.
     parentPath.foreach{p =>
-      if (relation.fields.contains(p._1.field)) "TODO"/* r.setField(p._1.field, p._2.id.get) */}
+      if (relation.fields.contains(p._1.field)) "TODO"/* r.setField(p._1.field, p._2.id.getValue) */}
     var foreigns: Seq[Pair[Association[_, _], Node]] = Nil
     node.attributes.foreach(a => setRecordField(r, a.key, a.value.toString))
     node.child.foreach {
