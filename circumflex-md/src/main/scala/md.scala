@@ -3,6 +3,7 @@ package ru.circumflex.md
 import ru.circumflex.core._
 import java.util.regex._
 import java.util.Random
+import java.lang.StringBuilder
 
 // # The Markdown Processor
 
@@ -54,7 +55,10 @@ object Markdown {
   val rnd = new Random
   val blockTags = "p" :: "div" :: "h1" :: "h2" :: "h3" :: "h4" :: "h5" :: "h6" ::
       "blockquote" :: "pre" :: "table" :: "dl" :: "ol" :: "ul" :: "script" ::
-      "noscript" :: "form" :: "fieldset" :: "iframe" :: "math" :: "ins" :: "del" :: Nil
+      "noscript" :: "form" :: "fieldset" :: "iframe" :: "math" :: "ins" :: "del" ::
+      "article" :: "aside" :: "footer" :: "header" :: "hgroup" :: "nav" :: "section" ::
+      "figure" :: "video" :: "audio" :: "embed" :: "canvas" :: "address" :: "details" ::
+      "object" ::  Nil
   val htmlNameTokenExpr = "[a-z_:][a-z0-9\\-_:.]*"
 
   // ## Regex patterns
@@ -164,8 +168,8 @@ object Markdown {
       (Pattern.compile("\\(c\\)", Pattern.CASE_INSENSITIVE) -> copy) ::
       (Pattern.compile("\\(tm\\)", Pattern.CASE_INSENSITIVE) -> trademark) ::
       (Pattern.compile("\\.{3}") -> ellipsis) :: Nil
-
-
+  // Markdown inside inline HTML
+  val rInlineMd = Pattern.compile("<!--#md-->(.*)<!--~+-->", Pattern.DOTALL)
 
   /**
    * Convert the `source` from Markdown to HTML.
@@ -281,9 +285,18 @@ class MarkdownText(source: CharSequence) {
       // Having inline HTML subsequence
       val endIdx = idx
       val startIdx = m.start
-      text.protectSubseq(htmlProtector, startIdx, endIdx)
+      val inlineHtml = new StringEx(text.subSequence(startIdx, endIdx))
+      // Process markdown inside
+      inlineHtml.replaceAll(rInlineMd, m => new MarkdownText(m.group(1)).toHtml)
+      // Hashify block
+      val key = htmlProtector.addToken(inlineHtml.toString)
+      val sb = new StringBuilder(text.subSequence(0, startIdx))
+        .append("\n")
+        .append(key)
+        .append("\n")
+        .append(text.subSequence(endIdx, text.length))
       // Continue recursively until all blocks are processes
-      hashHtmlBlocks(text)
+      hashHtmlBlocks(new StringEx(sb))
     } else text
   }
 
@@ -331,14 +344,14 @@ class MarkdownText(source: CharSequence) {
       .replaceAll(rH1, m => {
     val id = m.group(3)
     val idAttr = if (id == null) "" else " id = \"" + id + "\""
-    "<h1" + idAttr + ">" + m.group(1) + "</h1>"
+    "<h1" + idAttr + ">" + runSpanGamut(new StringEx(m.group(1))) + "</h1>"
   }).replaceAll(rH2, m => {
     val id = m.group(3)
     val idAttr = if (id == null) "" else " id = \"" + id + "\""
-    "<h2" + idAttr + ">" + m.group(1) + "</h2>"
+    "<h2" + idAttr + ">" + runSpanGamut(new StringEx(m.group(1))) + "</h2>"
   }).replaceAll(rHeaders, m => {
     val marker = m.group(1)
-    val body = m.group(2)
+    val body = runSpanGamut(new StringEx(m.group(2)))
     val id = m.group(4)
     val idAttr = if (id == null) "" else " id = \"" + id + "\""
     "<h" + marker.length + idAttr + ">" + body + "</h" + marker.length + ">"
