@@ -375,7 +375,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
       if (records.length == 0) return 0
 
       transactionManager.dml{conn =>
-        val fs = this.fields.filter(f => f != id)
+        val fs = this.fields.filter(_ != id)
         val sql = dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
         val st = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
@@ -386,22 +386,21 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
         val rows = st.executeBatch
         val keys = st.getGeneratedKeys
         var count = 0
-        // getGeneratedKeys may return only one id (the latest)
-        var latestId = if (keys.next) keys.getLong(1) else -1
-        var i = records.length - 1
-        while (i > 0) {
+        // getGeneratedKeys returns only one id (the first)
+        var keyId = if (keys.next) keys.getLong(1) else -1
+        var i = 0
+        while (i < rows.length) {
           val row = rows(i)
           if (row > 0) {
             count += 1
-            if (latestId > 0) {
+            if (keyId > 0) {
               // refresh latestId for this record
-              updateCache(latestId, records(i))
-              latestId -= 1
+              updateCache(keyId, records(i))
+              keyId += 1
             }
           }
-          i -= 1
+          i += 1
         }
-        
         count
       }
     }
