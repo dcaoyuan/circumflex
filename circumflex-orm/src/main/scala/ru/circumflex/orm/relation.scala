@@ -5,7 +5,6 @@ import JDBC._
 import java.sql.Statement
 import ru.circumflex.core.Circumflex
 import ru.circumflex.core.CircumflexUtil._
-import com.google.common.collect.HashBiMap
 import java.sql.PreparedStatement
 import scala.collection.mutable.ListBuffer
 
@@ -56,7 +55,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
 
   // @todo, when to clear it or use weak reference one?
-  private var idToRecord = HashBiMap.create[Long, R]
+  private var idToRecord = WeakHashBiMap[Long, R]()
 
   protected[orm] var _fields: Seq[Field[_]] = ListBuffer()
   protected[orm] var _associations: Seq[Association[R, _]] = ListBuffer()
@@ -165,17 +164,17 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    */
   def readOnly_? : Boolean = false
 
-  def idOf(record: R): Option[Long] = Option(idToRecord.inverse.get(record))
-  def recordOf(id: Long): Option[R] = Option(idToRecord.get(id))
+  def idOf(record: R): Option[Long] = idToRecord.inverse.get(record)
+  def recordOf(id: Long): Option[R] = idToRecord.get(id)
   def updateCache(id: Long, record: R) = idToRecord.put(id, record)
   def evictCache(id: Long) = idToRecord.remove(id)
   def evictCache(record: R) = idToRecord.inverse.remove(record)
-  def invalideCaches {idToRecord = HashBiMap.create[Long, R]}
+  def invalideCaches {idToRecord = WeakHashBiMap[Long, R]()}
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
    */
-  def transient_?(record: R): Boolean = !idToRecord.inverse.containsKey(record)
+  def transient_?(record: R): Boolean = !idToRecord.inverse.contains(record)
 
   /**
    * Create new `RelationNode` with specified `alias`.
