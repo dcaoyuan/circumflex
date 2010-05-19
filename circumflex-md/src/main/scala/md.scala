@@ -160,9 +160,11 @@ object Markdown {
   val rEm = Pattern.compile("(\\*|_)(?=\\S)(.+?)(?<=\\S)\\1")
   // Manual linebreaks
   val rBrs = Pattern.compile(" {2,}\n")
+  // Ampersand wrapping
+  val rAmp = Pattern.compile("&amp;(?!#?[xX]?(?:[0-9a-fA-F]+|\\w+);)")
   // SmartyPants
-  val smartyPants = (Pattern.compile("(?<=\\s|\\A)(?:\"|&quot;)(?=\\S)") -> leftQuote) ::
-      (Pattern.compile("(?<=\\S)(?:\"|&quot;)(?!\\w)") -> rightQuote) ::
+  val smartyPants = (Pattern.compile("(?<!\\w)(?:\"|&quot;)(?=\\w)") -> leftQuote) ::
+      (Pattern.compile("(?<=\\w)(?:\"|&quot;)(?!\\w)") -> rightQuote) ::
       (Pattern.compile("--") -> dash) ::
       (Pattern.compile("\\(r\\)", Pattern.CASE_INSENSITIVE) -> reg) ::
       (Pattern.compile("\\(c\\)", Pattern.CASE_INSENSITIVE) -> copy) ::
@@ -205,13 +207,13 @@ class MarkdownText(source: CharSequence) {
   /**
    * All unsafe chars are encoded to SGML entities.
    */
-  protected def encodeUnsafeChars(code: String): String = code
+  protected def encodeUnsafeChars(code: StringEx): StringEx = code
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
-      .replaceAll("\\*", "&#42;")
+      .replaceAll("*", "&#42;")
       .replaceAll("`", "&#96;")
       .replaceAll("_", "&#95;")
-      .replaceAll("\\\\", "&#92;")
+      .replaceAll("\\", "&#92;")
 
   /**
    * All characters escaped with backslash are encoded to corresponding
@@ -224,8 +226,10 @@ class MarkdownText(source: CharSequence) {
   /**
    * All unsafe chars are encoded to SGML entities inside code blocks.
    */
-  protected def encodeCode(code: String): String =
-    encodeUnsafeChars(code.replaceAll("&", "&amp;"))
+  protected def encodeCode(code: StringEx): StringEx = code
+      .replaceAll(rEscAmp, "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
 
   /**
    * Ampersands and less-than signes are encoded to `&amp;` and `&lt;` respectively.
@@ -238,13 +242,10 @@ class MarkdownText(source: CharSequence) {
    * Encodes specially-treated characters inside the HTML tags.
    */
   protected def encodeCharsInsideTags(text: StringEx) =
-    text.replaceAll(rInsideTags, m => {
-      var content = m.group(1)
-      content = encodeUnsafeChars(content)
-      var result = new StringEx(content)
+    text.replaceAll(rInsideTags, m =>
+      "<" + encodeUnsafeChars(new StringEx(m.group(1)))
           .replaceAll(rEscAmp, "&amp;")
-      "<" + result.toString + ">"
-    })
+          .toString + ">")
 
   // ## Processing methods
 
@@ -291,10 +292,10 @@ class MarkdownText(source: CharSequence) {
       // Hashify block
       val key = htmlProtector.addToken(inlineHtml.toString)
       val sb = new StringBuilder(text.subSequence(0, startIdx))
-        .append("\n")
-        .append(key)
-        .append("\n")
-        .append(text.subSequence(endIdx, text.length))
+          .append("\n")
+          .append(key)
+          .append("\n")
+          .append(text.subSequence(endIdx, text.length))
       // Continue recursively until all blocks are processes
       hashHtmlBlocks(new StringEx(sb))
     } else text
@@ -407,7 +408,7 @@ class MarkdownText(source: CharSequence) {
   protected def doCodeBlocks(text: StringEx): StringEx =
     text.replaceAll(rCodeBlock, m => {
       var langExpr = ""
-      val code = new StringEx(encodeCode(m.group(1)))
+      val code = encodeCode(new StringEx(m.group(1)))
           .outdent
           .replaceAll(rTrailingWS, "")
           .replaceAll(rCodeLangId, m => {
@@ -446,7 +447,7 @@ class MarkdownText(source: CharSequence) {
    */
   protected def runSpanGamut(text: StringEx): StringEx = {
     val protector = new Protector
-    var result = doCodeSpans(text)
+    var result = doCodeSpans(protector, text)
     result = encodeBackslashEscapes(text)
     result = doImages(text)
     result = doRefLinks(text)
@@ -456,7 +457,7 @@ class MarkdownText(source: CharSequence) {
     result = protectHtmlTags(protector, text)
     result = doSmartyPants(text)
     result = doAmpSpans(text)
-    result = unprotectHtmlTags(protector, text)
+    result = unprotect(protector, text)
     result = doEmphasis(text)
     return result
   }
@@ -464,14 +465,14 @@ class MarkdownText(source: CharSequence) {
   protected def protectHtmlTags(protector: Protector, text: StringEx): StringEx =
     text.replaceAll(rInsideTags, m => protector.addToken(m.group(0)))
 
-  protected def unprotectHtmlTags(protector: Protector, text: StringEx): StringEx =
+  protected def unprotect(protector: Protector, text: StringEx): StringEx =
     protector.keys.foldLeft(text)((t, k) => t.replaceAll(k, protector.decode(k).getOrElse("")))
 
   /**
    * Process code spans.
    */
-  protected def doCodeSpans(text: StringEx): StringEx = text.replaceAll(rCodeSpan, m =>
-    "<code>" + encodeCode(m.group(2).trim) + "</code>")
+  protected def doCodeSpans(protector: Protector, text: StringEx): StringEx = text.replaceAll(rCodeSpan, m =>
+    protector.addToken("<code>" + encodeCode(new StringEx(m.group(2).trim)) + "</code>"))
 
   /**
    * Process images.
@@ -572,7 +573,7 @@ class MarkdownText(source: CharSequence) {
    * Wrap ampersands with `<span class="amp">`.
    */
   protected def doAmpSpans(text: StringEx): StringEx =
-    text.replaceAll("&amp;", "<span class=\"amp\">&amp;</span>")
+    text.replaceAll(rAmp, "<span class=\"amp\">&amp;</span>")
 
   /**
    * Transform the Markdown source into HTML.
