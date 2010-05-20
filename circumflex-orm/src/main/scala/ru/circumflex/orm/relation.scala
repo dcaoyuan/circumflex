@@ -170,6 +170,13 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def updateCache(id: Long, record: R) = idToRecord.put(id, record)
   def evictCache(id: Long) = idToRecord.remove(id)
   def evictCache(record: R) = idToRecord.inverse.remove(record)
+  def evictCaches(records: Array[R]) {
+    var i = 0
+    while (i < records.length) {
+      idToRecord.inverse.remove(records(i))
+      i += 1
+    }
+  }
   def invalideCaches {idToRecord = HashBiMap[Long, R]()}
 
   /**

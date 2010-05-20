@@ -68,6 +68,9 @@ class Entry[K, V](private var _key: K, private var _value: V, queue: ReferenceQu
  *  its size is automatically doubled. Both parameters may be changed by
  *  overriding the corresponding values in class `HashTable`.
  *
+ *  The entries in this hash table extend WeakReference, using its main ref
+ *  field as the key.
+ *
  *  @author  Matthias Zenger
  *  @author  Martin Odersky
  *  @version 2.0, 31/12/2006
@@ -77,15 +80,6 @@ class Entry[K, V](private var _key: K, private var _value: V, queue: ReferenceQu
  */
 trait WeakKeyHashTable[K, V] {
   import WeakKeyHashTable._
-
-  /**
-   * The entries in this hash table extend WeakReference, using its main ref
-   * field as the key.
-   */
-
-
-
-  //protected type Entry >: Null <: HashEntry[K, Entry]
 
   /** The load factor for the hash table (in 0.001 step).
    */
@@ -393,7 +387,7 @@ trait WeakKeyHashTable[K, V] {
   /**
    * Returns the table after first expunging stale entries.
    */
-  private def getTable: Array[Entry[K, V]]  = {
+  private def getTable: Array[Entry[K, V]] = {
     expungeStaleEntries
     table
   }
