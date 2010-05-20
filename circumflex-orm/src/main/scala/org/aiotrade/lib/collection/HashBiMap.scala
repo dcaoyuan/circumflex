@@ -1,11 +1,13 @@
 package org.aiotrade.lib.collection
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.generic.CanBuildFrom
 import scala.collection.generic.MutableMapFactory
 import scala.collection.mutable.DefaultEntry
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.Map
 import scala.collection.mutable.MapLike
+import scala.collection.JavaConversions._
 
 object HashBiMap extends MutableMapFactory[HashBiMap] {
   implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), HashBiMap[A, B]] = new MapCanBuildFrom[A, B]
@@ -13,11 +15,11 @@ object HashBiMap extends MutableMapFactory[HashBiMap] {
 }
 
 @serializable @SerialVersionUID(1L)
-class HashBiMap[A, B](forward: HashMap[A, B], backward: HashMap[B, A]
+class HashBiMap[A, B](forward: ConcurrentHashMap[A, B], backward: ConcurrentHashMap[B, A]
 ) extends Map[A, B]
      with MapLike[A, B, HashBiMap[A, B]] {
 
-  def this() = this(new HashMap[A, B], new HashMap[B, A])
+  def this() = this(new ConcurrentHashMap[A, B], new ConcurrentHashMap[B, A])
 
   type Entry = DefaultEntry[A, B]
 
@@ -33,37 +35,37 @@ class HashBiMap[A, B](forward: HashMap[A, B], backward: HashMap[B, A]
   override def size: Int = forward.size
 
   def get(key: A): Option[B] = {
-    forward.get(key)
+    Option(forward.get(key))
   }
 
   override def put(key: A, value: B): Option[B] = {
     backward.put(value, key)
-    forward.put(key, value)
+    Option(forward.put(key, value))
   }
 
   override def update(key: A, value: B): Unit = put(key, value)
 
   override def remove(key: A): Option[B] = {
     forward.get(key) match {
-      case Some(v) => backward.remove(v)
-      case None =>
+      case null =>
+      case v => backward.remove(v)
     }
-    forward.remove(key)
+    Option(forward.remove(key))
   }
 
   def +=(kv: (A, B)): this.type = {
-    forward += kv
-    backward += (kv._2 -> kv._1)
+    forward. put(kv._1, kv._2)
+    backward.put(kv._2, kv._1)
     this
   }
 
   def -=(key: A): this.type = {
     forward.get(key) match {
-      case Some(v) => backward -= v
-      case None =>
+      case v: B => backward.remove(v)
+      case null =>
     }
 
-    forward -= key
+    forward.remove(key)
     this
   }
 
@@ -100,8 +102,8 @@ class HashBiMap[A, B](forward: HashMap[A, B], backward: HashMap[B, A]
     in.defaultReadObject
     val theForward = in.readObject.asInstanceOf[HashMap[A, B]]
     for ((k, v) <- theForward) {
-      forward += (k -> v)
-      backward += (v -> k)
+      forward. put(k, v)
+      backward.put(v, k)
     }
   }
 }
