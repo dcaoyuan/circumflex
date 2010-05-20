@@ -1,4 +1,4 @@
-package ru.circumflex.orm
+package org.aiotrade.lib.collection
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.generic.MutableMapFactory
@@ -7,25 +7,25 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.Map
 import scala.collection.mutable.MapLike
 
-object WeakHashBiMap extends MutableMapFactory[WeakHashBiMap] {
-  implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), WeakHashBiMap[A, B]] = new MapCanBuildFrom[A, B]
-  def empty[A, B]: WeakHashBiMap[A, B] = new WeakHashBiMap[A, B]
+object HashBiMap extends MutableMapFactory[HashBiMap] {
+  implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), HashBiMap[A, B]] = new MapCanBuildFrom[A, B]
+  def empty[A, B]: HashBiMap[A, B] = new HashBiMap[A, B]
 }
 
 @serializable @SerialVersionUID(1L)
-class WeakHashBiMap[A, B](forward: HashMap[A, B], backward: HashMap[B, A]
+class HashBiMap[A, B](forward: HashMap[A, B], backward: HashMap[B, A]
 ) extends Map[A, B]
-     with MapLike[A, B, WeakHashBiMap[A, B]] {
+     with MapLike[A, B, HashBiMap[A, B]] {
 
   def this() = this(new HashMap[A, B], new HashMap[B, A])
 
   type Entry = DefaultEntry[A, B]
 
-  private lazy val inverseOne = new WeakHashBiMap(backward, forward)
+  private lazy val inverseOne = new HashBiMap(backward, forward)
 
-  def inverse: WeakHashBiMap[B, A] = inverseOne
+  def inverse: HashBiMap[B, A] = inverseOne
 
-  override def empty: WeakHashBiMap[A, B] = WeakHashBiMap.empty[A, B]
+  override def empty: HashBiMap[A, B] = HashBiMap.empty[A, B]
   override def clear = {
     forward.clear
     backward.clear
@@ -105,4 +105,3 @@ class WeakHashBiMap[A, B](forward: HashMap[A, B], backward: HashMap[B, A]
     }
   }
 }
-

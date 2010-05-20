@@ -3,6 +3,7 @@ package ru.circumflex.orm
 import ORM._
 import JDBC._
 import java.sql.Statement
+import org.aiotrade.lib.collection.HashBiMap
 import ru.circumflex.core.Circumflex
 import ru.circumflex.core.CircumflexUtil._
 import java.sql.PreparedStatement
@@ -55,7 +56,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
 
   // @todo, when to clear it or use weak reference one?
-  private var idToRecord = WeakHashBiMap[Long, R]()
+  private var idToRecord = HashBiMap[Long, R]()
 
   protected[orm] var _fields: Seq[Field[_]] = ListBuffer()
   protected[orm] var _associations: Seq[Association[R, _]] = ListBuffer()
@@ -169,7 +170,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def updateCache(id: Long, record: R) = idToRecord.put(id, record)
   def evictCache(id: Long) = idToRecord.remove(id)
   def evictCache(record: R) = idToRecord.inverse.remove(record)
-  def invalideCaches {idToRecord = WeakHashBiMap[Long, R]()}
+  def invalideCaches {idToRecord = HashBiMap[Long, R]()}
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
