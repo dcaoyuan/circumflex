@@ -5,17 +5,19 @@ import scala.collection.generic.MutableMapFactory
 import scala.collection.mutable.Map
 import scala.collection.mutable.MapLike
 
-object WeakKeyHashMap extends MutableMapFactory[WeakKeyHashMap] {
-  implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), WeakKeyHashMap[A, B]] = new MapCanBuildFrom[A, B]
-  def empty[A, B]: WeakKeyHashMap[A, B] = new WeakKeyHashMap[A, B]
+object WeakIdentityBiHashMap extends MutableMapFactory[WeakIdentityBiHashMap] {
+  implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), WeakIdentityBiHashMap[A, B]] = new MapCanBuildFrom[A, B]
+  def empty[A, B]: WeakIdentityBiHashMap[A, B] = new WeakIdentityBiHashMap[AnyRef, B].asInstanceOf[WeakIdentityBiHashMap[A, B]]
 }
 
 @serializable @SerialVersionUID(1L)
-class WeakKeyHashMap[A, B] extends Map[A, B]
-                              with MapLike[A, B, WeakKeyHashMap[A, B]]
-                              with WeakKeyHashTable[A, B] {
+class WeakIdentityBiHashMap[@specialized A, @specialized B](
+  protected implicit val m: Manifest[A]
+) extends Map[A, B]
+     with MapLike[A, B, WeakIdentityBiHashMap[A, B]]
+     with WeakIdentityBiHashTable[A, B] {
 
-  override def empty: WeakKeyHashMap[A, B] = WeakKeyHashMap.empty[A, B]
+  override def empty: WeakIdentityBiHashMap[A, B] = new WeakIdentityBiHashMap[A, B]
   override def clear() = clearTable
   override def size: Int = {
     if (tableSize == 0) return 0
@@ -29,10 +31,31 @@ class WeakKeyHashMap[A, B] extends Map[A, B]
     else Some(e.value)
   }
 
+  def getByValue(value: B): Option[A] = {
+    val e = findEntryByValue(value)
+    if (e == null) None
+    else Some(e.key)
+  }
+
   override def put(key: A, value: B): Option[B] = {
     val e = findEntry(key)
-    if (e == null) { addEntry(new Entry(key, value, queue)); None }
-    else { val v = e.value; e.value = value; Some(v) }
+    
+    if (e == null) {
+      // make sure: key 1 <--> 1 value
+      val e1 = findEntryByValue(value)
+      if (e1 == null) {
+        addEntry(new WeakEntry(key, value, queue))
+        None
+      } else {
+        removeEntry(e1)
+        addEntry(new WeakEntry(key, value, queue))
+        Some(e1.value)
+      }
+    } else {
+      val v = e.value
+      e.value = value
+      Some(v)
+    }
   }
 
   override def update(key: A, value: B): Unit = put(key, value)
@@ -45,7 +68,7 @@ class WeakKeyHashMap[A, B] extends Map[A, B]
 
   def +=(kv: (A, B)): this.type = {
     val e = findEntry(kv._1)
-    if (e == null) addEntry(new Entry(kv._1, kv._2, queue))
+    if (e == null) addEntry(new WeakEntry(kv._1, kv._2, queue))
     else e.value = kv._2
     this
   }
@@ -85,7 +108,7 @@ class WeakKeyHashMap[A, B] extends Map[A, B]
   }
 
   private def readObject(in: java.io.ObjectInputStream) {
-    init[B](in, new Entry(_, _, queue))
+    init[B](in, new WeakEntry(_, _, queue))
   }
 }
 
