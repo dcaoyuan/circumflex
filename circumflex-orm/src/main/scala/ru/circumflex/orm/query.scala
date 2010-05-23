@@ -70,10 +70,16 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
   // ### Data Retrieval Stuff
 
   protected[orm] val lazyFetchers = ListBuffer[() => Unit]()
+  /**
+   * A holder to hold strong references of records that were created during this query,
+   * so these records won't be GCed and can be reached by lazyFetchers
+   */
+  protected[orm] val recordsHolder = ListBuffer[AnyRef]()
 
   private def applyLazyFetchers {
     lazyFetchers foreach (_.apply())
     lazyFetchers.clear
+    recordsHolder.clear
   }
 
   private def setProjectionQuery(projection: Projection[_]) {

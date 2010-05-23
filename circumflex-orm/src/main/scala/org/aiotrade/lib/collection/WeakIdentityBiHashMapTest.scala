@@ -1,8 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package org.aiotrade.lib.collection
 
 object WeakIdentityBiHashMapTest {
@@ -85,13 +80,32 @@ object WeakIdentityBiHashMapTest {
   }
 
   def testLots {
+    val size = 60
     val map = new WeakIdentityBiHashMap[String, Long]
-    val keys = (0 until 20) map {i =>
+    var keys = (0 until size) map {i =>
       val k = new String("String" + i)
       map.put(k, i)
       k
     }
 
     map foreach println
+
+    (0 until size) foreach {i =>
+      assert(map.getByValue(i).get == ("String" + i), "Value " + i + " lost entry")
+      assert(map.get("String" + i).isEmpty, "Identity Map error at " + i)
+      assert(map.get(keys(i)).get == i, "Key " + keys(i) + " value should be: " + i + ", but it's: " + map.get(keys(i)))
+    }
+
+    keys = null
+
+    (0 until 20) foreach {_ =>
+      System.gc
+      /**
+       * Verify Full GC with the -verbose:gc option
+       * We expect the map to be emptied as the strong references to
+       * all the keys are discarded. The map size should be 2 now
+       */
+      println("map.size should be 0: " + map.size + "  " + map.mkString("[", ", ", "]"))
+    }
   }
 }

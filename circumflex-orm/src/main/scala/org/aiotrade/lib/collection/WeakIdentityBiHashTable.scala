@@ -109,7 +109,7 @@ trait WeakIdentityBiHashTable[K, V] {
   /**
    * Table store key index of value, searchable according to value's hash
    */
-  @transient protected var valueToIdx: HashMap[V, Int] = new HashMap
+  @transient protected var valueToEntry: HashMap[V, WeakEntry[K, V]] = new HashMap
 
   /** The number of mappings contained in this hash table.
    */
@@ -142,7 +142,7 @@ trait WeakIdentityBiHashTable[K, V] {
     assert(size >= 0)
 
     table = new Array(capacity(size * loadFactorDenum / _loadFactor))
-    valueToIdx = new HashMap
+    valueToEntry = new HashMap
     threshold = newThreshold(table.length)
 
     var idx = 0
@@ -182,15 +182,8 @@ trait WeakIdentityBiHashTable[K, V] {
     e
   }
 
-  protected def findEntryByValue(value: V): WeakEntry[K, V] = valueToIdx.get(value) match {
-    case Some(idx) =>
-      val tab = getTable
-      var e = tab(idx)
-      while (e != null && !elemEquals(e.value, value)) e = e.nextEntry
-      e
-    case None => null
-  }
-  
+  protected def findEntryByValue(value: V): WeakEntry[K, V] = 
+    valueToEntry.get(value) getOrElse null
 
   /** Add entry to table
    *  pre: no entry with same key exists
@@ -202,7 +195,7 @@ trait WeakIdentityBiHashTable[K, V] {
     e.hash = h
     e.nextEntry = tab(idx)
     tab(idx) = e
-    valueToIdx.put(e.value, idx)
+    valueToEntry.put(e.value, e)
     tableSize = tableSize + 1
     if (tableSize > threshold)
       resize(2 * tab.length)
@@ -218,7 +211,7 @@ trait WeakIdentityBiHashTable[K, V] {
       if (elemEquals(e.get, key)) {
         tab(idx) = e.nextEntry
         tableSize = tableSize - 1
-        valueToIdx.remove(e.value)
+        valueToEntry.remove(e.value)
         return e
       } else {
         var e1 = e.nextEntry
@@ -229,7 +222,7 @@ trait WeakIdentityBiHashTable[K, V] {
         if (e1 != null) {
           e.nextEntry = e1.nextEntry
           tableSize = tableSize - 1
-          valueToIdx.remove(e1.value)
+          valueToEntry.remove(e1.value)
           return e1
         }
       }
@@ -246,7 +239,7 @@ trait WeakIdentityBiHashTable[K, V] {
       if (elemEquals(e.get, key)) {
         tab(idx) = e.nextEntry
         tableSize = tableSize - 1
-        valueToIdx.remove(e.value)
+        valueToEntry.remove(e.value)
         return e
       } else {
         var e1 = e.nextEntry
@@ -257,7 +250,7 @@ trait WeakIdentityBiHashTable[K, V] {
         if (e1 != null) {
           e.nextEntry = e1.nextEntry
           tableSize = tableSize - 1
-          valueToIdx.remove(e1.value)
+          valueToEntry.remove(e1.value)
           return e1
         }
       }
@@ -373,7 +366,7 @@ trait WeakIdentityBiHashTable[K, V] {
     while (i >= 0) {table(i) = null; i += 1}
     tableSize = 0
 
-    valueToIdx.clear
+    valueToEntry.clear
 
     // Allocation of array may have caused GC, which may have caused
     // additional entries to go stale.  Removing these entries from the
@@ -414,7 +407,7 @@ trait WeakIdentityBiHashTable[K, V] {
         val key = e.get
         if (key == null) {
           e.nextEntry = null  // Help GC
-          valueToIdx.remove(e.value)
+          valueToEntry.remove(e.value)
           e.value = null.asInstanceOf[V] //  "   "
           tableSize -= 1
         } else {
@@ -469,7 +462,7 @@ trait WeakIdentityBiHashTable[K, V] {
             // Must not null out e.next;
             // stale entries may be in use by a HashIterator
             tableSize -= 1
-            valueToIdx.remove(e.value)
+            valueToEntry.remove(e.value)
             e.value = null.asInstanceOf[V] // Help GC
             break = true
           } else {

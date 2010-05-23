@@ -152,6 +152,7 @@ class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeP
     }
 
   protected def readRecord(rs: ResultSet, record: R): R = {
+    query.recordsHolder += record
     _fieldProjections foreach {
       case p if p.field == node.relation.primaryKey =>
         node.relation.updateCache(p.read(rs).asInstanceOf[Long], record)
@@ -165,7 +166,7 @@ class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeP
     if (node.relation.transient_?(record)) return nope
     else {
       // Otherwise cache it and return.
-      tx.updateRecordCache(node.relation, record)
+      //tx.updateRecordCache(node.relation, record)
       return record
     }
   }
