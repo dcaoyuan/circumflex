@@ -184,6 +184,9 @@ class DefaultConnectionProvider extends ConnectionProvider {
         ds.setJdbcUrl(url)
         ds.setUser(username)
         ds.setPassword(password)
+        ds.setMinPoolSize(5)
+        ds.setAcquireIncrement(5)
+        ds.setMaxPoolSize(20)
         ds
       }
   }
