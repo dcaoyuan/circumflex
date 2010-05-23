@@ -3,7 +3,7 @@ package ru.circumflex.orm
 import ORM._
 import JDBC._
 import java.sql.Statement
-import org.aiotrade.lib.collection.HashBiMap
+import org.aiotrade.lib.collection.WeakIdentityBiHashMap
 import ru.circumflex.core.Circumflex
 import ru.circumflex.core.CircumflexUtil._
 import java.sql.PreparedStatement
@@ -55,8 +55,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   private val recordSample: R = recordClass.newInstance
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
 
-  // @todo, when to clear it or use weak reference one?
-  private var idToRecord = HashBiMap[Long, R]()
+  private var recordToId = WeakIdentityBiHashMap[R, Long]()
 
   protected[orm] var _fields: Seq[Field[_]] = ListBuffer()
   protected[orm] var _associations: Seq[Association[R, _]] = ListBuffer()
@@ -165,24 +164,23 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    */
   def readOnly_? : Boolean = false
 
-  def idOf(record: R): Option[Long] = idToRecord.inverse.get(record)
-  def recordOf(id: Long): Option[R] = idToRecord.get(id)
-  def updateCache(id: Long, record: R) = idToRecord.put(id, record)
-  def evictCache(id: Long) = idToRecord.remove(id)
-  def evictCache(record: R) = idToRecord.inverse.remove(record)
+  def idOf(record: R): Option[Long] = recordToId.get(record)
+  def recordOf(id: Long): Option[R] = recordToId.getByValue(id)
+  def updateCache(id: Long, record: R) = recordToId.put(record, id)
+  def evictCache(record: R) = recordToId.remove(record)
   def evictCaches(records: Array[R]) {
     var i = 0
     while (i < records.length) {
-      idToRecord.inverse.remove(records(i))
+      recordToId.remove(records(i))
       i += 1
     }
   }
-  def invalideCaches {idToRecord = HashBiMap[Long, R]()}
+  def invalideCaches {recordToId = WeakIdentityBiHashMap[R, Long]()}
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
    */
-  def transient_?(record: R): Boolean = !idToRecord.inverse.contains(record)
+  def transient_?(record: R): Boolean = !recordToId.contains(record)
 
   /**
    * Create new `RelationNode` with specified `alias`.
