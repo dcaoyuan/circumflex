@@ -3,7 +3,7 @@ package ru.circumflex.orm
 import xml._
 
 
-object TestModel {
+object Model {
 
   class Country {
     // Constructor shortcuts
