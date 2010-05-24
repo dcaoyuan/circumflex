@@ -116,7 +116,7 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
       val root = foreignRelation
       (SELECT (root.*) FROM (relation JOIN root) WHERE (field EQ id)).unique match {
         case Some(fRecord) =>
-          tx.updateRecordCache(foreignRelation, fRecord)
+          //tx.updateRecordCache(foreignRelation, fRecord)
           field._setValue(record, fRecord)
           Some(fRecord)
         case None => None
@@ -133,10 +133,10 @@ class InverseAssociation[P <: AnyRef, C <: AnyRef](val association: Association[
     if (association.foreignRelation.transient_?(record)) Nil
     else tx.getCachedInverse(record, this) match {  // lookup in cache
       case null => // lazy fetch
-        val id = association.foreignRelation.idOf(record).get
+        val id = association.foreignRelation.idOf(record)
         val root = association.relation
         val v = (SELECT (root.*) FROM (root) WHERE (association.field EQ id)).list
-        tx.updateInverseCache(record, this, v)
+        //tx.updateInverseCache(record, this, v)
         v
       case l: Seq[C] => l
     }
