@@ -123,52 +123,57 @@ class FieldProjection[T, R <: AnyRef](val node: RelationNode[R],
  * A projection for reading entire `Record`.
  */
 class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeProjection[R] {
-  protected val _fieldProjections: Seq[FieldProjection[Any, R]] = (
-    node
-    .relation
-    .fields
-    .map(f => new FieldProjection(node, f.asInstanceOf[Field[Any]]))
-  )
-  
-  val subProjections = _fieldProjections
+  private type FP = FieldProjection[Any, R]
+
+//  protected val _fieldProjections: Seq[FP] =
+//    node.relation.fields.map(f => new FieldProjection(node, f.asInstanceOf[Field[Any]]))
+
+  val (pkProjection, otherProjections) = ((None: Option[FP], Nil: List[FP]) /: node.relation.fields) {(acc, f) =>
+    val p = new FieldProjection(node, f.asInstanceOf[Field[Any]])
+    if (f == node.relation.primaryKey)
+      (Some(p), acc._2)
+    else
+      (acc._1, p :: acc._2)
+  }
+
+  val subProjections = pkProjection match {
+    case Some(p) => p :: otherProjections
+    case None => otherProjections
+  }
 
   // We will return this `null`s in any failure conditions.
   protected def nope: R = null.asInstanceOf[R]
 
-  def read(rs: ResultSet): R =
-    _fieldProjections.find(_.field == node.relation.primaryKey) match {
-      case Some(pkProjection) =>
-        pkProjection.read(rs) match {
+  def read(rs: ResultSet): R = {
+    pkProjection match {
+      case Some(p) =>
+        p.read(rs) match {
           case id: Long =>
             // Has this record been cached? if true, should use and update it via rs instead of creae a new instance
             val record: R = node.relation.recordOf(id) match {
               case Some(x) => x
-              case None => node.relation.recordClass.newInstance
+              case None =>
+                val x = node.relation.recordClass.newInstance
+                node.relation.updateCache(id, x)
+                x
             }
             readRecord(rs, record)
-          case x => throw new Exception("Error in read id of " + node.relation.recordClass.getSimpleName + ", which alias is '" + pkProjection.alias + "', value read is " + x)
+          case x => throw new Exception("Error in read id of " + node.relation.recordClass.getSimpleName + ", which alias is '" + p.alias + "', value read is " + x)
         }
-      case _ => nope
+      case None => nope
     }
+  }
 
-  protected def readRecord(rs: ResultSet, record: R): R = {
+  private def readRecord(rs: ResultSet, record: R): R = {
     query.recordsHolder += record
-    _fieldProjections foreach {
-      case p if p.field == node.relation.primaryKey =>
-        node.relation.updateCache(p.read(rs).asInstanceOf[Long], record)
-      case p =>
-        p.field.setValue(record, p.read(rs).asInstanceOf[AnyRef]) match {
-          case Some(lazyAction) => query.lazyFetchers += lazyAction
-          case None =>
-        }
+    otherProjections foreach {p =>
+      p.field.setValue(record, p.read(rs).asInstanceOf[AnyRef]) match {
+        case Some(lazyAction) => query.lazyFetchers += lazyAction
+        case None =>
+      }
     }
     // If record remains unidentified, do not return it.
-    if (node.relation.transient_?(record)) return nope
-    else {
-      // Otherwise cache it and return.
-      //tx.updateRecordCache(node.relation, record)
-      return record
-    }
+    if (node.relation.transient_?(record)) nope else record
   }
 
   override def equals(obj: Any) = obj match {

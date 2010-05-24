@@ -135,9 +135,9 @@ class InverseAssociation[P <: AnyRef, C <: AnyRef](val association: Association[
       case null => // lazy fetch
         val id = association.foreignRelation.idOf(record)
         val root = association.relation
-        val v = (SELECT (root.*) FROM (root) WHERE (association.field EQ id)).list
-        //tx.updateInverseCache(record, this, v)
-        v
+        val l = (SELECT (root.*) FROM (root) WHERE (association.field EQ id) list)
+        //tx.updateInverseCache(record, this, l)
+        l
       case l: Seq[C] => l
     }
   }
