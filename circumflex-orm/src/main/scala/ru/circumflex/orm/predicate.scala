@@ -101,6 +101,9 @@ class SimpleExpressionHelper(val expr: String) {
     new SimpleExpression(expr + " " + dialect.between, List(lowerValue, upperValue))
   def BETWEEN(lowerValue: Any, upperValue: Any) = between(lowerValue, upperValue)
 
+  def bitAnd(value: Any) = new SimpleExpression(dialect.bitAnd(expr, value), Nil)
+  def BITAND(value: Any) = bitAnd(value)
+
   /* ### Simple subqueries */
 
   def in(query: SQLQuery[_]) =

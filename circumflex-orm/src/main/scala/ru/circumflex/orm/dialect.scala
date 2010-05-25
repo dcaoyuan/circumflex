@@ -89,6 +89,7 @@ class Dialect {
   def min = "MIN"
   def sum = "SUM"
   def avg = "AVG"
+  def bitAnd(expr1: String, expr2: Any) = "BITAND(" + expr1 + "," + expr2 + ")"
 
   // ### Set operations
 

@@ -14,6 +14,7 @@ class MySQLDialect extends Dialect {
     node.alias + "." + node.relation.primaryKey.name + " = LAST_INSERT_ID()"
   override def setReferentialIntegrity(enable: Boolean) =
     "set foreign_key_checks = " + (if (enable) "1" else "0")
+  override def bitAnd(expr1: String, expr2: Any) = "(" + expr1 + " & " + expr2 + ")"
 }
 
 class OracleDialect extends Dialect {
