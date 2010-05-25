@@ -88,22 +88,24 @@ class DDLUnit {
   protected def dropObjects(objects: Seq[SchemaObject], conn: Connection) =
     for (o <- objects.reverse) {
       if (o.isInstanceOf[Relation[_]]) o.asInstanceOf[Relation[_]].invalideCaches
-      
-      autoClose(conn.prepareStatement(o.sqlDrop))(st => {
+
+      val sql = o.sqlDrop
+      ormLog.info(sql)
+      autoClose(conn.prepareStatement(sql)){st =>
         st.executeUpdate
-        _msgs ++= List(InfoMsg("DROP "  + o.objectName + ": OK", o.sqlDrop))
-      })(e =>
-      _msgs ++= List(ErrorMsg("DROP " + o.objectName + ": " + e.getMessage, o.sqlDrop)))
+        _msgs ++= List(InfoMsg("DROP "  + o.objectName + ": OK", sql))
+      }(e =>
+        _msgs ++= List(ErrorMsg("DROP " + o.objectName + ": " + e.getMessage, sql)))
     }
 
   protected def createObjects(objects: Seq[SchemaObject], conn: Connection) =
     for (o <- objects) {
       val sql = o.sqlCreate
       ormLog.info(sql)
-      autoClose(conn.prepareStatement(sql))(st => {
-          st.executeUpdate
-          _msgs ++= List(InfoMsg("CREATE " + o.objectName + ": OK", sql))
-        })(e =>
+      autoClose(conn.prepareStatement(sql)){st =>
+        st.executeUpdate
+        _msgs ++= List(InfoMsg("CREATE " + o.objectName + ": OK", sql))
+      }(e =>
         _msgs ++= List(ErrorMsg("CREATE " + o.objectName + ": " + e.getMessage, sql)))
     }
   /**
@@ -138,23 +140,34 @@ class DDLUnit {
     resetMsgs()
     _create()
   }
-  protected def _create(): this.type = auto(tx.connection)(conn => {
-      // We will commit every successfull statement.
-      val autoCommit = conn.getAutoCommit
-      conn.setAutoCommit(true)
-      // Execute a script.
-      if (dialect.supportsSchema_?)
-        createObjects(schemata, conn)
-      createObjects(preAux, conn)
-      createObjects(tables, conn)
-      createObjects(constraints, conn)
-      createObjects(views, conn)
-      createObjects(postAux, conn)
-      // Restore auto-commit.
-      conn.setAutoCommit(autoCommit)
-      return this
-    })
+  protected def _create(): this.type = auto(tx.connection){conn =>
+    // We will commit every successfull statement.
+    val autoCommit = conn.getAutoCommit
+    conn.setAutoCommit(true)
+    // Execute a script.
+    if (dialect.supportsSchema_?)
+      createObjects(schemata, conn)
+    createObjects(preAux, conn)
+    createObjects(tables, conn)
+    createObjects(constraints, conn)
+    createObjects(views, conn)
+    createObjects(postAux, conn)
+    // disable Referential integrity check, @todo, it's better to not add RI constraints?
+    setReferentialIntegrity(false, conn)
+    // Restore auto-commit.
+    conn.setAutoCommit(autoCommit)
+    return this
+  }
 
+  def setReferentialIntegrity(enable: Boolean, conn: Connection) {
+    val sql = dialect.setReferentialIntegrity(enable)
+    autoClose(conn.prepareStatement(sql)){st =>
+      st.executeUpdate
+      _msgs ++= List(InfoMsg("OK: ", sql))
+    }(e =>
+      _msgs ++= List(ErrorMsg(e.getMessage, sql)))
+  }
+  
   /**
    * Execute a DROP script and then a CREATE script.
    */

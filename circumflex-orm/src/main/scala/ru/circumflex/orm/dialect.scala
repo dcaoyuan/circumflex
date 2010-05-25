@@ -183,6 +183,12 @@ class Dialect {
     alterTable(constraint.relation, "DROP CONSTRAINT " + constraint.constraintName);
 
   /**
+   * Produce `SET REFERENTIAL_INTEGRITY` TRUE/FALSE.
+   */
+  def setReferentialIntegrity(enable: Boolean) =
+    "SET REFERENTIAL_INTEGRITY " + enable
+
+  /**
    * Produces `CREATE SCHEMA` statement.
    */
   def createSchema(schema: Schema) = "CREATE SCHEMA " + schema.name
@@ -190,7 +196,7 @@ class Dialect {
   /**
    * Produce `DROP SCHEMA` statement.
    */
-  def dropSchema(schema: Schema) = "DROP SCHEMA IF EXISTS " + schema.name
+  def dropSchema(schema: Schema) = "DROP SCHEMA " + schema.name
 
   /**
    * Produce `CREATE TABLE` statement without constraints.
@@ -204,7 +210,7 @@ class Dialect {
    * Produce `DROP TABLE` statement.
    */
   def dropTable(table: Table[_]) =
-    "DROP TABLE IF EXISTS " + table.qualifiedName
+    "DROP TABLE " + table.qualifiedName
 
   /**
    * Produces `CREATE VIEW` statement.
@@ -218,7 +224,7 @@ class Dialect {
    * Produce `DROP VIEW` statement.
    */
   def dropView(view: View[_]) =
-    "DROP VIEW IF EXISTS " + view.qualifiedName
+    "DROP VIEW " + view.qualifiedName
 
   /**
    * Produce `CREATE INDEX` statement.
@@ -233,7 +239,7 @@ class Dialect {
   /**
    * Produce `DROP INDEX` statement.
    */
-  def dropIndex(idx: Index) = "DROP INDEX IF EXISTS " + idx.relation.schema.name + "." + idx.name
+  def dropIndex(idx: Index) = "DROP INDEX " + idx.name + " ON " + idx.relation.qualifiedName
 
   /**
    * SQL definition for a column represented by specified `field`
