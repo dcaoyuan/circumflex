@@ -23,6 +23,7 @@ class Dialect {
   // ### SQL types
 
   def longType = "BIGINT"
+  def tinyintType = "TINYINT"
   def integerType = "INTEGER"
   def floatType  (precision: Int = -1, scale: Int = 0) = "FLOAT"   + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
   def doubleType (precision: Int = -1, scale: Int = 0) = "DOUBLE"  + (if (precision == -1) "" else "(" + precision + "," + scale + ")")

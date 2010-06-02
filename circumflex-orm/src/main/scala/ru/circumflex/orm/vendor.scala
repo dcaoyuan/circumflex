@@ -18,6 +18,7 @@ class MySQLDialect extends Dialect {
 }
 
 class OracleDialect extends Dialect {
+  override def tinyintType = "NUMBER(1)"
   override def textType = "VARCHAR2(4096)"
   override def timestampType = "TIMESTAMP WITH TIMEZONE"
   override def primaryKeyExpression(relation: Relation[_]) = ""

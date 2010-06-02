@@ -95,6 +95,12 @@ abstract class XmlSerializableField[T](relation: Relation[_],
   def to(value: T) = value.toString
 }
 
+class TinyintField(relation: Relation[_],
+                   name: String, uuid: String
+) extends XmlSerializableField[Int](relation, name, uuid, dialect.tinyintType) {
+  def from(string: String) = string.toByte
+}
+
 class IntField(relation: Relation[_],
                name: String, uuid: String
 ) extends XmlSerializableField[Int](relation, name, uuid, dialect.integerType) {

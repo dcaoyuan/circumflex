@@ -550,6 +550,7 @@ class DefinitionHelper[R <: AnyRef](relation: Relation[R], name: String) {
 
   def uuid = relation.getClass.getName + "." + name
 
+  def tinyint = new TinyintField(relation, name, uuid)
   def integer = new IntField(relation, name, uuid)
   def bigint = new LongField(relation, name, uuid)
   def float(precision: Int = -1, scale: Int = 0) = new FloatField(relation, name, uuid, precision, scale)
@@ -564,6 +565,7 @@ class DefinitionHelper[R <: AnyRef](relation: Relation[R], name: String) {
   def time = new TimeField(relation, name, uuid)
   def timestamp = new TimestampField(relation, name, uuid)
 
+  def TINYINT = tinyint
   def INTEGER = integer
   def BIGINT = bigint
   def FLOAT(precision: Int = -1, scale: Int = 1) = float(precision, scale)
