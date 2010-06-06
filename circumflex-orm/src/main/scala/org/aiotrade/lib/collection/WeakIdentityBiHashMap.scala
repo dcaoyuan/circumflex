@@ -1,7 +1,6 @@
 package org.aiotrade.lib.collection
 
-import java.util.concurrent.locks.Lock
-import java.util.concurrent.locks.ReentrantReadWriteLock
+import scala.actors.threadpool.locks.ReentrantReadWriteLock
 import scala.collection.generic.CanBuildFrom
 import scala.collection.generic.MutableMapFactory
 import scala.collection.mutable.Map
@@ -20,8 +19,8 @@ class WeakIdentityBiHashMap[@specialized A, @specialized B](
      with WeakIdentityBiHashTable[A, B] {
 
   private val readWriteLock = new ReentrantReadWriteLock
-  val readLock:  Lock = readWriteLock.readLock
-  val writeLock: Lock = readWriteLock.writeLock
+  val readLock  = readWriteLock.readLock
+  val writeLock = readWriteLock.writeLock
 
   override def empty: WeakIdentityBiHashMap[A, B] = new WeakIdentityBiHashMap[A, B]
   override def clear() = clearTable

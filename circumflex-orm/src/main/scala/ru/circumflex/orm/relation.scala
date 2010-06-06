@@ -165,40 +165,40 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def readOnly_? : Boolean = false
 
   def idOf(record: R): Option[Long] = {
+    recordToId.readLock.lock
     try {
-      recordToId.readLock.lock
       recordToId.get(record)
     } finally {
       recordToId.readLock.unlock
     }
   }
   def recordOf(id: Long): Option[R] = {
+    recordToId.readLock.lock
     try {
-      recordToId.readLock.lock
       recordToId.getByValue(id)
     } finally {
       recordToId.readLock.unlock
     }
   }
   def updateCache(id: Long, record: R) {
+    recordToId.writeLock.lock
     try {
-      recordToId.writeLock.lock
       recordToId.put(record, id)
     } finally {
       recordToId.writeLock.unlock
     }
   }
   def evictCache(record: R) {
+    recordToId.writeLock.lock
     try {
-      recordToId.writeLock.lock
       recordToId.remove(record)
     } finally {
       recordToId.writeLock.unlock
     }
   }
   def evictCaches(records: Array[R]) {
+    recordToId.writeLock.lock
     try {
-      recordToId.writeLock.lock
       var i = 0
       while (i < records.length) {
         recordToId.remove(records(i))
@@ -214,8 +214,8 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    * Yield `true` if `primaryKey` field is empty (contains `None`).
    */
   def transient_?(record: R): Boolean = {
+    recordToId.readLock.lock
     try {
-      recordToId.readLock.lock
       !recordToId.contains(record)
     } finally {
       recordToId.readLock.unlock
