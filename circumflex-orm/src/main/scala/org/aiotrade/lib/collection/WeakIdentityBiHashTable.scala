@@ -430,7 +430,14 @@ trait WeakIdentityBiHashTable[K, V] {
 
   protected def elemHashCode(x: Any) = if (x == null) 0 else hash(x)
 
-  protected final def index(hcode: Int) = ((hcode << 1) - (hcode << 8)) & (table.length - 1)
+  protected final def improve(hcode: Int) = {
+    var h: Int = hcode + ~(hcode << 9)
+    h = h ^ (h >>> 14)
+    h = h + (h << 4)
+    h ^ (h >>> 10)
+  }
+
+  protected final def index(hcode: Int) = improve(hcode) & (table.length - 1)
 
   /**
    * Returns the table after first expunging stale entries.
