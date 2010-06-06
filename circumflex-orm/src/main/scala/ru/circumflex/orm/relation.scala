@@ -164,23 +164,63 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    */
   def readOnly_? : Boolean = false
 
-  def idOf(record: R): Option[Long] = recordToId synchronized {recordToId.get(record)}
-  def recordOf(id: Long): Option[R] = recordToId synchronized {recordToId.getByValue(id)}
-  def updateCache(id: Long, record: R) = recordToId synchronized {recordToId.put(record, id)}
-  def evictCache(record: R) = recordToId synchronized {recordToId.remove(record)}
-  def evictCaches(records: Array[R]): Unit = recordToId synchronized {
-    var i = 0
-    while (i < records.length) {
-      recordToId.remove(records(i))
-      i += 1
+  def idOf(record: R): Option[Long] = {
+    try {
+      recordToId.readLock.lock
+      recordToId.get(record)
+    } finally {
+      recordToId.readLock.unlock
     }
   }
-  def invalideCaches: Unit = recordToId synchronized {recordToId = WeakIdentityBiHashMap[R, Long]()}
+  def recordOf(id: Long): Option[R] = {
+    try {
+      recordToId.readLock.lock
+      recordToId.getByValue(id)
+    } finally {
+      recordToId.readLock.unlock
+    }
+  }
+  def updateCache(id: Long, record: R) {
+    try {
+      recordToId.writeLock.lock
+      recordToId.put(record, id)
+    } finally {
+      recordToId.writeLock.unlock
+    }
+  }
+  def evictCache(record: R) {
+    try {
+      recordToId.writeLock.lock
+      recordToId.remove(record)
+    } finally {
+      recordToId.writeLock.unlock
+    }
+  }
+  def evictCaches(records: Array[R]) {
+    try {
+      recordToId.writeLock.lock
+      var i = 0
+      while (i < records.length) {
+        recordToId.remove(records(i))
+        i += 1
+      }
+    } finally {
+      recordToId.writeLock.unlock
+    }
+  }
+  def invalideCaches {recordToId = WeakIdentityBiHashMap[R, Long]()}
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
    */
-  def transient_?(record: R): Boolean = recordToId synchronized {!recordToId.contains(record)}
+  def transient_?(record: R): Boolean = {
+    try {
+      recordToId.readLock.lock
+      !recordToId.contains(record)
+    } finally {
+      recordToId.readLock.unlock
+    }
+  }
 
   /**
    * Create new `RelationNode` with specified `alias`.
