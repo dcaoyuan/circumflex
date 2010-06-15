@@ -175,7 +175,10 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def recordOf(id: Long): Option[R] = {
     recordToId.readLock.lock
     try {
-      recordToId.getByValue(id)
+      recordToId.getByValue(id) match {
+        case None | Some(null) => None
+        case some => some
+      }
     } finally {
       recordToId.readLock.unlock
     }
