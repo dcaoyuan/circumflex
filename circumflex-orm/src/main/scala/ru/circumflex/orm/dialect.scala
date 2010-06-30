@@ -198,7 +198,7 @@ class Dialect {
   /**
    * Produce `DROP SCHEMA` statement.
    */
-  def dropSchema(schema: Schema) = "DROP SCHEMA " + schema.name
+  def dropSchema(schema: Schema) = "DROP SCHEMA " + schema.name + " CASCADE"
 
   /**
    * Produce `CREATE TABLE` statement without constraints.
