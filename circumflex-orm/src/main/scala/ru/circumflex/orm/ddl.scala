@@ -115,7 +115,7 @@ class DDLUnit {
     resetMsgs()
     _drop()
   }
-  protected def _drop(): this.type = auto(tx.connection)(conn => {
+  def _drop(): this.type = auto(tx.connection)(conn => {
       // We will commit every successfull statement.
       val autoCommit = conn.getAutoCommit
       conn.setAutoCommit(true)
@@ -140,7 +140,7 @@ class DDLUnit {
     resetMsgs()
     _create()
   }
-  protected def _create(): this.type = auto(tx.connection){conn =>
+  def _create(): this.type = auto(tx.connection){conn =>
     // We will commit every successfull statement.
     val autoCommit = conn.getAutoCommit
     conn.setAutoCommit(true)
