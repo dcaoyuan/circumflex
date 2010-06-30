@@ -64,10 +64,10 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
       case node: RelationNode[N] =>
         if (node.relation == association.relation) {   // N == C
           val a = association.asInstanceOf[Association[N, P]]
-          new ManyToOneJoin(node, preparePf(a.foreignRelation, a), a, LEFT_JOIN)
+          new ManyToOneJoin(node, preparePf(a.foreignRelation, a), a, LEFT)
         } else if (node.relation == association.foreignRelation) {  // N == P
           val a = association.asInstanceOf[Association[C, N]]
-          new OneToManyJoin(node, preparePf(a.relation, a), a, LEFT_JOIN)
+          new OneToManyJoin(node, preparePf(a.relation, a), a, LEFT)
         } else node
     }
 
