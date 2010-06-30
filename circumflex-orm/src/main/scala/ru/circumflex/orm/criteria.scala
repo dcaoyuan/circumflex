@@ -131,7 +131,7 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
   
   protected def prepareLimitOffsetPredicate: Predicate = {
     val n = rootNode.clone.as("__lo")
-    val q = SELECT (n.id) FROM (n) LIMIT (_limit) OFFSET (_offset)
+    val q = SELECT (n.id) FROM (n) LIMIT (_limit) OFFSET (_offset) ORDER_BY (_orders: _*)
     return rootNode.id IN (q)  
   }
 
@@ -203,7 +203,7 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
    * Make a DML `UPDATE` query from this criteria. Only `WHERE` clause is used, all the
    * other stuff is ignored.
    */
-  def mkUpdate: Update[R] = UPDATE(rootNode.relation).WHERE(predicate)
+  def mkUpdate: Update[R] = UPDATE(rootNode).WHERE(predicate)
 
   /**
    * Make a DML `DELETE` query from this criteria. Only `WHERE` clause is used, all the

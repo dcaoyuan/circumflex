@@ -12,8 +12,10 @@ package object orm {
 
   implicit def relation2node[R <: AnyRef](relation: Relation[R]): RelationNode[R] =
     relation.as(relation.relationName)
-  implicit def node2relation[R <: AnyRef](node: RelationNode[R]): Relation[R] =
+  implicit def node2Relation[R <: AnyRef](node: RelationNode[R]): Relation[R] = {
+    lastAlias(node.alias) // is this necessary ?
     node.relation
+  }
   implicit def string2helper(expression: String): SimpleExpressionHelper =
     new SimpleExpressionHelper(expression)
   implicit def string2predicate(expression: String): Predicate =
@@ -33,10 +35,6 @@ package object orm {
    relation.r */
   implicit def field2projection[T](field: Field[T]): Projection[T] =
     new ExpressionProjection[T](field2str(field))
-  implicit def node2Relation[R <: AnyRef](node: RelationNode[R]) = {
-    lastAlias(node.alias)
-    node.relation
-  }
   // The most magical ones.
   /* implicit def node2record[R <: AnyRef](node: RelationNode[R]): R = {
    lastAlias(node.alias)
@@ -192,8 +190,8 @@ package object orm {
   def SELECT[T](projection: Projection[T]) = select(projection)
   def insertInto[R <: AnyRef](relation: Relation[R]) = new InsertSelectHelper(relation)
   def INSERT_INTO[R <: AnyRef](relation: Relation[R]) = insertInto(relation)
-  def update[R <: Record[R]](node: RelationNode[R]) = new Update(node)
-  def UPDATE[R <: Record[R]](node: RelationNode[R]) = update(node)
+  def update[R <: AnyRef](node: RelationNode[R]) = new Update(node)
+  def UPDATE[R <: AnyRef](node: RelationNode[R]) = update(node)
   def delete[R <: AnyRef](node: RelationNode[R]) = new Delete(node)
   def DELETE[R <: AnyRef](node: RelationNode[R]) = delete(node)
 
