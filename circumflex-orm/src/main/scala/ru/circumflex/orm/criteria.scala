@@ -114,12 +114,13 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
         val parent = tuple(pIndex).asInstanceOf[P]
         val child = tuple(cIndex).asInstanceOf[C]
         if (parent != null) {
-          val children = tx.getCachedInverse(parent, a) match {
+          var children = tx.getCachedInverse(parent, a) match {
             case null => Nil
             case l: Seq[C] => l
           }
           if (child != null && !children.contains(child))
-            tx.updateInverseCache(parent, a, children ++ List(child))
+            children ++= List(child)
+          tx.updateInverseCache(parent, a, children)
         }
         processTupleTree(tuple, j.left)
         processTupleTree(tuple, j.right)
@@ -225,9 +226,9 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
   def predicate: Predicate = {
     if (_limit != -1 || _offset != 0)
       add(prepareLimitOffsetPredicate)
-     if (_restrictions.size > 0)
-       AND(_restrictions: _*)
-     else EmptyPredicate
+    if (_restrictions.size > 0)
+      AND(_restrictions: _*)
+    else EmptyPredicate
   }
 
   /**
