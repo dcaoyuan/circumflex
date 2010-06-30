@@ -396,7 +396,7 @@ class Dialect {
    * Produce `UPDATE` statement.
    */
   def update(dml: Update[_]): String = {
-    var result = "UPDATE " + dml.relation.qualifiedName + " SET " +
+    var result = "UPDATE " + dml.node.toSql + " SET " +
     dml.setClause.map(_._1.name + " = ?").mkString(", ")
     if (dml.where != EmptyPredicate) result += " WHERE " + dml.where.toSql
     return result
@@ -406,7 +406,7 @@ class Dialect {
    * Produce `DELETE` statement.
    */
   def delete(dml: Delete[_]): String = {
-    var result = "DELETE FROM " + dml.relation.qualifiedName
+    var result = "DELETE FROM " + dml.node.toSql
     if (dml.where != EmptyPredicate) result += " WHERE " + dml.where.toSql
     return result
   }

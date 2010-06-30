@@ -236,6 +236,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
        */
       val relation: Relation.this.type = Relation.this
     }).as(alias)
+  def AS(alias: String) = as(alias)
 
   /**
    * Try to find an association to specified `relation`.
