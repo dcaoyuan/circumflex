@@ -27,17 +27,17 @@
       <artifactId>c3p0</artifactId>
       <version>0.9.1.2</version>
     </dependency>
-    <dependency>
-       <groupId>mysql</groupId>
-       <artifactId>mysql-connector-java</artifactId>
-       <version>5.1.9</version>
-       <scope>test</scope>
-     </dependency>
   </dependencies>
 
   <profiles>
     <profile>
       <id>postgresql</id>
+      <activation>
+        <property>
+          <name>db</name>
+          <value>postgresql</value>
+        </property>
+      </activation>
       <properties>
         <orm.connection.driver>org.postgresql.Driver</orm.connection.driver>
         <orm.connection.url>jdbc:postgresql://localhost:5432/inca</orm.connection.url>
@@ -57,11 +57,17 @@
     </profile>
     <profile>
       <id>mysql</id>
+      <activation>
+        <property>
+          <name>db</name>
+          <value>mysql</value>
+        </property>
+      </activation>
       <properties>
         <orm.connection.driver>com.mysql.jdbc.Driver</orm.connection.driver>
         <orm.connection.url>jdbc:mysql://localhost:3306/inca</orm.connection.url>
-        <orm.connection.username>inca</orm.connection.username>
-        <orm.connection.password>incainca</orm.connection.password>
+        <orm.connection.username>root</orm.connection.username>
+        <orm.connection.password></orm.connection.password>
         <orm.dialect>ru.circumflex.orm.MySQLDialect</orm.dialect>
         <orm.defaultSchema>orm</orm.defaultSchema>
       </properties>
@@ -70,6 +76,32 @@
           <groupId>mysql</groupId>
           <artifactId>mysql-connector-java</artifactId>
           <version>5.1.9</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>h2</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+        <property>
+          <name>db</name>
+          <value>h2</value>
+        </property>
+      </activation>
+      <properties>
+        <orm.connection.driver>org.h2.Driver</orm.connection.driver>
+        <orm.connection.url>jdbc:h2:${user.home}/db/inca</orm.connection.url>
+        <orm.connection.username>sa</orm.connection.username>
+        <orm.connection.password>incainca</orm.connection.password>
+        <orm.dialect>ru.circumflex.orm.H2Dialect</orm.dialect>
+        <orm.defaultSchema>orm</orm.defaultSchema>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>com.h2database</groupId>
+          <artifactId>h2</artifactId>
+          <version>1.2.138</version>
           <scope>test</scope>
         </dependency>
       </dependencies>
