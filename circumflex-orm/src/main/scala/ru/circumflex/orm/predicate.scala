@@ -63,22 +63,40 @@ class SimpleExpressionHelper(val expr: String) {
 
   /* ### Simple expressions */
 
-  def EQ(value: Any) = new SimpleExpression(expr + " " + dialect.EQ, List(value))
+  def EQ(value: Any) = value match {
+    case query: SQLQuery[_] => new SubqueryExpression(expr + " = ", query)
+    case _ => new SimpleExpression(expr + " " + dialect.EQ, List(value))
+  }
   def _eq(value: Any) = EQ(value)
 
-  def NE(value: Any) = new SimpleExpression(expr + " " + dialect.NE, List(value))
+  def NE(value: Any) = value match {
+    case query: SQLQuery[_] => new SubqueryExpression(expr + " <> ", query)
+    case _ => new SimpleExpression(expr + " " + dialect.NE, List(value))
+  }
   def _ne(value: Any) = NE(value)
 
-  def GT(value: Any) = new SimpleExpression(expr + " " + dialect.GT, List(value))
+  def GT(value: Any) = value match {
+    case query: SQLQuery[_] => new SubqueryExpression(expr + " > ", query)
+    case _ => new SimpleExpression(expr + " " + dialect.GT, List(value))
+  }
   def _gt(value: Any) = GT(value)
 
-  def GE(value: Any) = new SimpleExpression(expr + " " + dialect.GE, List(value))
+  def GE(value: Any) = value match {
+    case query: SQLQuery[_] => new SubqueryExpression(expr + " >= ", query)
+    case _ => new SimpleExpression(expr + " " + dialect.GE, List(value))
+  }
   def _ge(value: Any) = GE(value)
 
-  def LT(value: Any) = new SimpleExpression(expr + " " + dialect.LT, List(value))
+  def LT(value: Any) = value match {
+    case query: SQLQuery[_] => new SubqueryExpression(expr + " < ", query)
+    case _ => new SimpleExpression(expr + " " + dialect.LT, List(value))
+  }
   def _lt(value: Any) = LT(value)
 
-  def LE(value: Any) = new SimpleExpression(expr + " " + dialect.LE, List(value))
+  def LE(value: Any) = value match {
+    case query: SQLQuery[_] => new SubqueryExpression(expr + " <= ", query)
+    case _ => new SimpleExpression(expr + " " + dialect.LE, List(value))
+  }
   def _le(value: Any) = LE(value)
 
   def isNull = new SimpleExpression(expr + " " + dialect.isNull, Nil)
