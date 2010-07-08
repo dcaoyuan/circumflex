@@ -10,6 +10,9 @@ package ru.circumflex.orm
  * implementation in your own class. After that, set the `orm.dialect`
  * configuration parameter accordingly.
  */
+import java.sql.ResultSet
+import scala.collection.mutable.HashMap
+
 object DefaultDialect extends Dialect
 
 /**
@@ -411,4 +414,9 @@ class Dialect {
     return result
   }
 
+  /**
+   * @return true  if the last  id
+   *         false if the first id
+   */
+  def returnGeneratedKeysIsTheLast = true
 }

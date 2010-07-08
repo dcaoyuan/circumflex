@@ -15,6 +15,7 @@ class MySQLDialect extends Dialect {
   override def setReferentialIntegrity(enable: Boolean) =
     "set foreign_key_checks = " + (if (enable) "1" else "0")
   override def bitAnd(expr1: String, expr2: Any) = "(" + expr1 + " & " + expr2 + ")"
+  override def returnGeneratedKeysIsTheLast = false
 }
 
 class OracleDialect extends Dialect {
@@ -43,6 +44,8 @@ class OracleDialect extends Dialect {
     relation.addPreAux(seq)
     relation.addPostAux(trig)
   }
+  // @todo
+  override def returnGeneratedKeysIsTheLast = false
 }
 
 class H2Dialect extends Dialect {
@@ -64,6 +67,7 @@ class H2Dialect extends Dialect {
     "DROP TABLE IF EXISTS " + table.relationName
   override def dropView(view: View[_]) =
     "DROP VIEW IF EXISTS " + view.relationName
+  override def returnGeneratedKeysIsTheLast = true
 }
 
 class DerbyDialect extends Dialect {

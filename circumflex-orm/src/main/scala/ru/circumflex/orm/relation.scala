@@ -440,20 +440,21 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
         val rows = st.executeBatch
         val keys = st.getGeneratedKeys
         var count = 0
-        // getGeneratedKeys returns only one id (the first)
+        // RETURN_GENERATED_KEYS returns only one id (the first or the last)
         var keyId = if (keys.next) keys.getLong(1) else -1
-        var i = 0
-        while (i < rows.length) {
+        val idIsOfTheLastRecord = dialect.returnGeneratedKeysIsTheLast
+        var i = if (idIsOfTheLastRecord) rows.length - 1 else 0
+        while (i >= 0 && i < rows.length) {
           val row = rows(i)
           if (row > 0) {
             count += 1
             if (keyId > 0) {
-              // refresh latestId for this record
+              // refresh id for this record
               updateCache(keyId, records(i))
-              keyId += 1
+              if (idIsOfTheLastRecord) keyId -= 1 else keyId += 1
             }
           }
-          i += 1
+          if (idIsOfTheLastRecord) i -= 1 else i += 1
         }
         count
       }
