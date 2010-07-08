@@ -493,6 +493,38 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   }
   def UPDATE(record: R, fields: Field[_]*) = update(record, fields: _*)
 
+  def updateBatch_!(records: Array[R], fields: Field[_]*): Int = {
+    if (readOnly_?)
+      throw new ORMException("The relation " + qualifiedName + " is read-only.")
+    else transactionManager.dml(conn => {
+        val fs: Seq[Field[_]] = if (fields.size == 0) _fields.filter(f => f != id) else fields
+        val sql = dialect.updateRecord(this, fs)
+        sqlLog.debug(sql)
+        val st = conn.prepareStatement(sql)
+        for (record <- records) {
+          setParams(record, st, fs)
+          typeConverter.write(st, idOf(record), fs.size + 1)
+          st.addBatch
+        }
+        val rows = st.executeBatch
+        var count = 0
+        var i = 0
+        while (i < rows.length) {
+          val row = rows(i)
+          if (row > 0) {
+            count += 1
+          }
+          i += 1
+        }
+        count
+      })
+  }
+
+  def updateBatch(records: Array[R], fields: Field[_]*): Int = {
+    records foreach validate
+    updateBatch_!(records, fields: _*)
+  }
+
   /**
    * Executes the `DELETE` statement for this record using primary key
    * as delete criteria.
