@@ -1,7 +1,5 @@
 package ru.circumflex.orm
 
-import _root_.ru.circumflex.core._
-import util.matching.Regex
 
 // ## Validation
 
@@ -21,7 +19,7 @@ case class ValidationError(val source: String,
         case None => errorKey
       }
     }
-  def toMsg(): String = toMsg(CircumflexContext.get.messages)
+ // def toMsg(): String = toMsg(CircumflexContext.get.messages)
 
   override def hashCode = source.hashCode * 31 + errorKey.hashCode
   override def equals(that: Any) = that match {
@@ -31,11 +29,9 @@ case class ValidationError(val source: String,
 }
 
 class ValidationException(val errors: ValidationError *)
-    extends CircumflexException("Validation failed.") {
-  val bySource = CircumflexUtil
-      .groupBy[String, ValidationError](errors, e => e.source)
-  val byKey = CircumflexUtil
-      .groupBy[String, ValidationError](errors, e => e.errorKey)
+    extends ORMException("Validation failed.") {
+  val bySource = groupBy[String, ValidationError](errors, e => e.source)
+  val byKey = groupBy[String, ValidationError](errors, e => e.errorKey)
 }
 
 class RecordValidator[R <: AnyRef](relation: Relation[R]) {

@@ -1,13 +1,14 @@
 package ru.circumflex.orm
 
 import com.mchange.v2.c3p0.ComboPooledDataSource
-import ru.circumflex.core.Circumflex
 import java.sql.{Timestamp, PreparedStatement, ResultSet, Connection}
 import java.util.Date
 import javax.naming.InitialContext
 import javax.sql.DataSource
 import ORM._
-import org.slf4j.LoggerFactory
+import net.lag.logging.Logger
+import org.aiotrade.lib.util.config.Config
+import org.aiotrade.lib.util.config.ConfigurationException
 
 // ## Configuration
 
@@ -17,7 +18,7 @@ import org.slf4j.LoggerFactory
  */
 object ORM {
 
-  protected[orm] val ormLog = LoggerFactory.getLogger("ru.circumflex.orm")
+  protected[orm] val ormLog = Logger.get("ru.circumflex.orm")
 
   // ### Global Configuration Objects
 
@@ -25,10 +26,8 @@ object ORM {
    * Connection provider.
    * Can be overriden with `orm.connectionProvider` configuration parameter.
    */
-  val connectionProvider: ConnectionProvider = Circumflex.get("orm.connectionProvider") match {
-    case Some(p: ConnectionProvider) => p
-    case Some(c: Class[ConnectionProvider]) => c.newInstance
-    case Some(s: String) => Circumflex.loadClass[ConnectionProvider](s).newInstance
+  val connectionProvider: ConnectionProvider = Config.config.getString("orm.connectionProvider") match {
+    case Some(s: String) => Config.loadClass[ConnectionProvider](s).newInstance
     case _ => DefaultConnectionProvider
   }
 
@@ -36,10 +35,8 @@ object ORM {
    * SQL dialect.
    * Can be overriden with `orm.dialect` configuration parameter.
    */
-  val dialect: Dialect = Circumflex.get("orm.dialect") match {
-    case Some(d: Dialect) => d
-    case Some(c: Class[Dialect]) => c.newInstance
-    case Some(s: String) => Circumflex.loadClass[Dialect](s).newInstance
+  val dialect: Dialect = Config.config.getString("orm.dialect") match {
+    case Some(s: String) => Config.loadClass[Dialect](s).newInstance
     case _ => DefaultDialect
   }
 
@@ -47,10 +44,8 @@ object ORM {
    * SQL type converter.
    * Can be overriden with `orm.typeConverter` configuration parameter.
    */
-  val typeConverter: TypeConverter = Circumflex.get("orm.typeConverter") match {
-    case Some(tc: TypeConverter) => tc
-    case Some(c: Class[TypeConverter]) => c.newInstance
-    case Some(s: String) => Circumflex.loadClass[TypeConverter](s).newInstance
+  val typeConverter: TypeConverter = Config.config.getString("orm.typeConverter") match {
+    case Some(s: String) => Config.loadClass[TypeConverter](s).newInstance
     case _ => DefaultTypeConverter
   }
 
@@ -58,7 +53,7 @@ object ORM {
    * The schema name which is used if not specified explicitly.
    * Can be overriden with `orm.defaultSchema` configuration parameter.
    */
-  val defaultSchema = Circumflex.get("orm.defaultSchema") match {
+  val defaultSchema = Config.config.getString("orm.defaultSchema") match {
     case Some(s: String) => new Schema(s)
     case _ => new Schema("public")
   }
@@ -67,10 +62,8 @@ object ORM {
    * Transaction manager.
    * Can be overriden with `orm.transactionManager` configuration parameter.
    */
-  val transactionManager: TransactionManager = Circumflex.get("orm.transactionManager") match {
-    case Some(tm: TransactionManager) => tm
-    case Some(c: Class[TransactionManager]) => c.newInstance
-    case Some(s: String) => Circumflex.loadClass[TransactionManager](s).newInstance
+  val transactionManager: TransactionManager = Config.config.getString("orm.transactionManager") match {
+    case Some(s: String) => Config.loadClass[TransactionManager](s).newInstance
     case _ => DefaultTransactionManager
   }
 
@@ -134,7 +127,7 @@ trait ConnectionProvider {
  */
 class DefaultConnectionProvider extends ConnectionProvider {
 
-  protected val isolation: Int = Circumflex.get("orm.connection.isolation") match {
+  protected val isolation: Int = Config.config.getString("orm.connection.isolation") match {
     case Some("none") => Connection.TRANSACTION_NONE
     case Some("read_uncommitted") => Connection.TRANSACTION_READ_UNCOMMITTED
     case Some("read_committed") => Connection.TRANSACTION_READ_COMMITTED
@@ -150,7 +143,7 @@ class DefaultConnectionProvider extends ConnectionProvider {
    * Configure datasource instance. It is retrieved from JNDI if 'orm.connection.datasource'
    * is specified or is constructed using c3p0 otherwise.
    */
-  protected val ds: DataSource = Circumflex.get("orm.connection.datasource") match {
+  protected val ds: DataSource = Config.config.getString("orm.connection.datasource") match {
     case Some(jndiName: String) => {
         val ctx = new InitialContext
         val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
@@ -159,25 +152,25 @@ class DefaultConnectionProvider extends ConnectionProvider {
       }
     case _ => {
         ormLog.info("Using c3p0 connection pooling.")
-        val driver = Circumflex.get("orm.connection.driver") match {
+        val driver = Config.config.getString("orm.connection.driver") match {
           case Some(s: String) => s
           case _ =>
-            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.driver'.")
+            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.driver'.")
         }
-        val url = Circumflex.get("orm.connection.url") match {
+        val url = Config.config.getString("orm.connection.url") match {
           case Some(s: String) => s
           case _ =>
-            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.url'.")
+            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.url'.")
         }
-        val username = Circumflex.get("orm.connection.username") match {
+        val username = Config.config.getString("orm.connection.username") match {
           case Some(s: String) => s
           case _ =>
-            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.username'.")
+            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.username'.")
         }
-        val password = Circumflex.get("orm.connection.password") match {
+        val password = Config.config.getString("orm.connection.password") match {
           case Some(s: String) => s
           case _ =>
-            throw new ORMException("Missing mandatory configuration parameter 'orm.connection.password'.")
+            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.password'.")
         }
         val ds = new ComboPooledDataSource()
         ds.setDriverClass(driver)

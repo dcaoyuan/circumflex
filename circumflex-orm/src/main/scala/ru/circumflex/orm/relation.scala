@@ -4,8 +4,7 @@ import ORM._
 import JDBC._
 import java.sql.Statement
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
-import ru.circumflex.core.Circumflex
-import ru.circumflex.core.CircumflexUtil._
+import org.aiotrade.lib.util.config.Config
 import java.sql.PreparedStatement
 import scala.collection.mutable.ListBuffer
 
@@ -24,7 +23,7 @@ object RelationRegistry {
     classToRelation.get(r.getClass) match {
       case Some(rel: Relation[R]) => rel
       case _ => {
-          val relClass = Circumflex.loadClass[Relation[R]](r.getClass.getName + "$")
+          val relClass = Config.loadClass[Relation[R]](r.getClass.getName + "$")
           val relation = relClass.getField("MODULE$").get(null).asInstanceOf[Relation[R]]
           classToRelation += (r.getClass -> relation)
           relation
@@ -38,6 +37,13 @@ object RelationRegistry {
 
 abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
+  /**
+   * Now this thingy is very useful and very light:
+   * it translates every `ThisKindOfIdentifiers`
+   * into `that_kinds_of_identifiers`.
+   */
+  private def camelCaseToUnderscore(arg: String) = arg.replaceAll("(?<!^)([A-Z])","_$1").toLowerCase
+
   // ### Implicits
 
   implicit def str2ddlHelper(name: String): DefinitionHelper[R] =
@@ -50,7 +56,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    * e.g. strip trailing `$` from `this.getClass.getName`.
    * getClass.getName.replaceAll("\\$(?=\\Z)", "")
    */
-  val recordClass: Class[R] = Circumflex.loadClass[R](m.erasure.getName)
+  val recordClass: Class[R] = Config.loadClass[R](m.erasure.getName)
 
   private val recordSample: R = recordClass.newInstance
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
@@ -71,7 +77,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
   /**
    * Relation name defaults to record's unqualified class name, transformed
-   * with `Circumflex.camelCaseToUnderscore`.
+   * with `camelCaseToUnderscore`.
    */
   val relationName = {
     val clzName = getClass.getSimpleName
@@ -111,7 +117,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
         case tpe if classOf[Field[_]].isAssignableFrom(tpe) =>
           val field = getter.invoke(this).asInstanceOf[Field[_]]
           if (field == null) {
-            ormLog.warn("Cannot get field val: " + getter)
+            ormLog.warning("Cannot get field val: " + getter)
           } else {
             recordFields find (_.name == getter.getName) match {
               case Some(recField) => res += (field -> recField)
@@ -121,7 +127,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
         case tpe if classOf[Association[R, _]].isAssignableFrom(tpe) =>
           val assoc = getter.invoke(this).asInstanceOf[Association[R, _]]
           if (assoc == null) {
-            ormLog.warn("Cannot get field val: " + getter)
+            ormLog.warning("Cannot get field val: " + getter)
           } else {
             recordFields find (_.name == getter.getName) match {
               case Some(recField) => res += (assoc.field -> recField)

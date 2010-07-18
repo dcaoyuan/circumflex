@@ -1,3 +1,4 @@
+/**
 package ru.circumflex.orm
 
 import ru.circumflex.core.{CircumflexContext, AbstractCircumflexFilter}
@@ -31,3 +32,4 @@ class TransactionManagementListener extends ServletRequestListener {
   def requestInitialized(sre: ServletRequestEvent) = {}
   def requestDestroyed(sre: ServletRequestEvent) = transactionManager.executeInContext(tx){}
 }
+*/

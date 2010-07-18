@@ -79,7 +79,7 @@ class Deployment(val id: String,
           }
         } catch {
           case e: NoSuchMethodException =>
-            ormLog.warn("Could not process '" + n.label + "' of " + r.getClass)
+            ormLog.warning("Could not process '" + n.label + "' of " + r.getClass)
         }
       case _ =>
     }
@@ -106,7 +106,7 @@ class Deployment(val id: String,
       field.setValue(r, value)
     }
   } catch {
-    case e: NoSuchMethodException => ormLog.warn("Could not process '" + k + "' of " + r.getClass)
+    case e: NoSuchMethodException => ormLog.warning("Could not process '" + k + "' of " + r.getClass)
   }
 
   protected def prepareCriteria[R <: AnyRef](r: R, n: Node): Criteria[R] = {

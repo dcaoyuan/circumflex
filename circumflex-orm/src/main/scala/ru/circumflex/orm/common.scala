@@ -4,9 +4,10 @@ import java.math.BigInteger
 import java.lang.reflect.Method
 import java.math.BigDecimal
 import java.util.ArrayList
-import org.slf4j.LoggerFactory
 import ORM._
-import ru.circumflex.core.WrapperModel
+import net.lag.logging.Logger
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.ListBuffer
 
 // ## Common interfaces
 
@@ -228,7 +229,7 @@ extends ParameterizedExpression {
  * `ResultSet`s and `PreparedStatement`s.
  */
 object JDBC {
-  protected[orm] val sqlLog = LoggerFactory.getLogger("ru.circumflex.orm")
+  protected[orm] val sqlLog = Logger.get("ru.circumflex.orm")
 
   def autoClose[A <: {def close(): Unit}, B](obj: A)
   (actions: A => B)
@@ -254,5 +255,42 @@ object JDBC {
 class ORMException(msg: String, cause: Throwable) extends Exception(msg, cause) {
   def this(msg: String) = this(msg, null)
   def this(cause: Throwable) = this(null, cause)
+
+  /**
+   * Performs a grouping operation on a collection. The result is a map
+   * in which keys are obtained via predicate function `predicateFunc` and
+   * values are subcollections, every element of which satisfies the predicate.
+   */
+  def groupBy[K,V](it: Iterable[V], predicateFunc: V => K): collection.Map[K, Seq[V]] = {
+    val result = new HashMap[K, ListBuffer[V]] {
+      override def default(a: K) = new ListBuffer[V]
+    }
+    it foreach {v =>
+      val key = predicateFunc(v)
+      val buffer: ListBuffer[V] = result(key)
+      buffer += v
+      result += (key -> buffer)
+    }
+    result
+  }
+}
+
+/**
+ * A very simple model for operating with structural data.
+ */
+trait HashModel {
+  def get(key: String): Option[Any]
+  def apply(key: String): Any = get(key).get
+  def getOrElse[A](key: String, default: =>A): A = get(key) match {
+    case Some(value: A) => value;
+    case _ => default
+  }
+}
+
+/**
+ * A very simple model for operating with wrappers.
+ */
+trait WrapperModel {
+  def item: Any
 }
 
