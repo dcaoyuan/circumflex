@@ -584,6 +584,20 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
     return this
   }
 
+  def exists: Boolean = {
+    val sql = "select * from " + qualifiedName + " where 1 = 0"
+    sqlLog.debug(sql)
+    try {
+      transactionManager.sql(sql){st =>
+        try {
+          val rs = st.executeQuery
+          rs.close
+          true
+        } catch {case _ => false}
+      }
+    } catch {case _ => false}
+  }
+
   // ### Equality and others
 
   override def equals(that: Any) = that match {
