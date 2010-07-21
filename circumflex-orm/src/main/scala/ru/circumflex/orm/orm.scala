@@ -19,6 +19,7 @@ import org.aiotrade.lib.util.config.ConfigurationException
 object ORM {
 
   protected[orm] val ormLog = Logger.get("ru.circumflex.orm")
+  private val config = Config()
 
   // ### Global Configuration Objects
 
@@ -26,7 +27,7 @@ object ORM {
    * Connection provider.
    * Can be overriden with `orm.connectionProvider` configuration parameter.
    */
-  val connectionProvider: ConnectionProvider = Config.config.getString("orm.connectionProvider") match {
+  val connectionProvider: ConnectionProvider = config.getString("orm.connectionProvider") match {
     case Some(s: String) => Config.loadClass[ConnectionProvider](s).newInstance
     case _ => DefaultConnectionProvider
   }
@@ -35,7 +36,7 @@ object ORM {
    * SQL dialect.
    * Can be overriden with `orm.dialect` configuration parameter.
    */
-  val dialect: Dialect = Config.config.getString("orm.dialect") match {
+  val dialect: Dialect = config.getString("orm.dialect") match {
     case Some(s: String) => Config.loadClass[Dialect](s).newInstance
     case _ => DefaultDialect
   }
@@ -44,7 +45,7 @@ object ORM {
    * SQL type converter.
    * Can be overriden with `orm.typeConverter` configuration parameter.
    */
-  val typeConverter: TypeConverter = Config.config.getString("orm.typeConverter") match {
+  val typeConverter: TypeConverter = config.getString("orm.typeConverter") match {
     case Some(s: String) => Config.loadClass[TypeConverter](s).newInstance
     case _ => DefaultTypeConverter
   }
@@ -53,7 +54,7 @@ object ORM {
    * The schema name which is used if not specified explicitly.
    * Can be overriden with `orm.defaultSchema` configuration parameter.
    */
-  val defaultSchema = Config.config.getString("orm.defaultSchema") match {
+  val defaultSchema = config.getString("orm.defaultSchema") match {
     case Some(s: String) => new Schema(s)
     case _ => new Schema("public")
   }
@@ -62,7 +63,7 @@ object ORM {
    * Transaction manager.
    * Can be overriden with `orm.transactionManager` configuration parameter.
    */
-  val transactionManager: TransactionManager = Config.config.getString("orm.transactionManager") match {
+  val transactionManager: TransactionManager = config.getString("orm.transactionManager") match {
     case Some(s: String) => Config.loadClass[TransactionManager](s).newInstance
     case _ => DefaultTransactionManager
   }
@@ -126,8 +127,9 @@ trait ConnectionProvider {
  *   [c3p0-cfg]: http://www.mchange.com/projects/c3p0/index.html#configuration_properties
  */
 class DefaultConnectionProvider extends ConnectionProvider {
+  private val config = Config()
 
-  protected val isolation: Int = Config.config.getString("orm.connection.isolation") match {
+  protected val isolation: Int = config.getString("orm.connection.isolation") match {
     case Some("none") => Connection.TRANSACTION_NONE
     case Some("read_uncommitted") => Connection.TRANSACTION_READ_UNCOMMITTED
     case Some("read_committed") => Connection.TRANSACTION_READ_COMMITTED
@@ -143,7 +145,7 @@ class DefaultConnectionProvider extends ConnectionProvider {
    * Configure datasource instance. It is retrieved from JNDI if 'orm.connection.datasource'
    * is specified or is constructed using c3p0 otherwise.
    */
-  protected val ds: DataSource = Config.config.getString("orm.connection.datasource") match {
+  protected val ds: DataSource = config.getString("orm.connection.datasource") match {
     case Some(jndiName: String) => {
         val ctx = new InitialContext
         val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
@@ -152,22 +154,22 @@ class DefaultConnectionProvider extends ConnectionProvider {
       }
     case _ => {
         ormLog.info("Using c3p0 connection pooling.")
-        val driver = Config.config.getString("orm.connection.driver") match {
+        val driver = config.getString("orm.connection.driver") match {
           case Some(s: String) => s
           case _ =>
             throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.driver'.")
         }
-        val url = Config.config.getString("orm.connection.url") match {
+        val url = config.getString("orm.connection.url") match {
           case Some(s: String) => s
           case _ =>
             throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.url'.")
         }
-        val username = Config.config.getString("orm.connection.username") match {
+        val username = config.getString("orm.connection.username") match {
           case Some(s: String) => s
           case _ =>
             throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.username'.")
         }
-        val password = Config.config.getString("orm.connection.password") match {
+        val password = config.getString("orm.connection.password") match {
           case Some(s: String) => s
           case _ =>
             throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.password'.")
