@@ -179,13 +179,15 @@ class DefaultConnectionProvider extends ConnectionProvider {
         ds.setJdbcUrl(url)
         ds.setUser(username)
         ds.setPassword(password)
-        ds.setMinPoolSize(5)
-        ds.setAcquireIncrement(5)
+        ds.setInitialPoolSize(4)
+        ds.setMinPoolSize(4)
         ds.setMaxPoolSize(20)
+        ds.setAcquireIncrement(4)
 
-        ds.setMaxConnectionAge(7200) // 2hours
-        ds.setMaxIdleTime(1800) // 30mins. After which an idle connection is removed from the pool
-        ds.setIdleConnectionTestPeriod(180) // 180s
+        ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2hours
+        // After which an idle connection is removed from the pool
+        ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 1800)) // default 30mins.
+        ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 180)) // default 180s
         ds
       }
   }
