@@ -182,6 +182,10 @@ class DefaultConnectionProvider extends ConnectionProvider {
         ds.setMinPoolSize(5)
         ds.setAcquireIncrement(5)
         ds.setMaxPoolSize(20)
+
+        ds.setMaxConnectionAge(7200) // 2hours
+        ds.setMaxIdleTime(1800) // 30mins. After which an idle connection is removed from the pool
+        ds.setIdleConnectionTestPeriod(180) // 180s
         ds
       }
   }
