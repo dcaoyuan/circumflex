@@ -1,11 +1,8 @@
 package ru.circumflex.orm
 
-import java.math.BigInteger
-import java.lang.reflect.Method
-import java.math.BigDecimal
-import java.util.ArrayList
 import ORM._
-import net.lag.logging.Logger
+import java.util.logging.Level
+import java.util.logging.Logger
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 
@@ -229,7 +226,7 @@ extends ParameterizedExpression {
  * `ResultSet`s and `PreparedStatement`s.
  */
 object JDBC {
-  protected[orm] val sqlLog = Logger.get("ru.circumflex.orm")
+  protected[orm] val sqlLog = Logger.getLogger("ru.circumflex.orm")
 
   def autoClose[A <: {def close(): Unit}, B](obj: A)
   (actions: A => B)
@@ -237,7 +234,9 @@ object JDBC {
     try {
       return actions(obj)
     } catch {
-      case e => return errors(e)
+      case e =>
+        sqlLog.log(Level.WARNING, e.getMessage, e)
+        return errors(e)
     } finally {
       obj.close
     }

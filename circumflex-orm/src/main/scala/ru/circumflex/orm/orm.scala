@@ -179,15 +179,20 @@ class DefaultConnectionProvider extends ConnectionProvider {
         ds.setJdbcUrl(url)
         ds.setUser(username)
         ds.setPassword(password)
-        ds.setInitialPoolSize(4)
-        ds.setMinPoolSize(4)
-        ds.setMaxPoolSize(20)
-        ds.setAcquireIncrement(4)
 
-        ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2hours
-        // After which an idle connection is removed from the pool
-        ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 1800)) // default 30mins.
-        ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 180)) // default 180s
+
+        // --- optional config
+        ds.setInitialPoolSize(config.getInt("orm.connection.initialPoolSize", 4))
+        ds.setMinPoolSize(config.getInt("orm.connection.minPoolSize", 4))
+        ds.setMaxPoolSize(config.getInt("orm.connection.maxPoolSize", 20))
+        ds.setAcquireIncrement(config.getInt("orm.connection.acquireIncrement", 4))
+
+        ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2 hours
+        ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 1800)) // default 30 mins. After which an idle connection is removed from the pool.
+        ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 600)) // default 10 mins
+        ds.setPreferredTestQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
+        ds.setTestConnectionOnCheckin(config.getBool("orm.connection.testConnectionOnCheckin", false))
+        ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", true))
         ds
       }
   }
