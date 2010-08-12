@@ -126,7 +126,7 @@ class StatefulTransaction {
   /**
    * Should underlying connection be closed on `commit` or `rollback`?
    */
-  protected var autoClose = false
+  protected var autoClose = true
 
   def setAutoClose(value: Boolean): this.type = {
     this.autoClose = value
