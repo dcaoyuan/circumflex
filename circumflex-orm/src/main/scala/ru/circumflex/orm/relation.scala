@@ -352,8 +352,13 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   /**
    * A helper to set parameters to `PreparedStatement`.
    */
-  protected[orm] def setParams(record: R, st: PreparedStatement, fields: Seq[Field[_]]) =
-    (0 until fields.size).foreach(ix => typeConverter.write(st, fields(ix).getValue(record), ix + 1))
+  protected[orm] def setParams(record: R, st: PreparedStatement, fields: Seq[Field[_]]) = {
+    var i = 0
+    while (i < fields.size) {
+      typeConverter.write(st, fields(i).getValue(record), i + 1)
+      i += 1
+    }
+  }
 
   /**
    * Uses last generated identity to refetch specified `record`.
@@ -393,6 +398,14 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
     else Some(errors)
   }
 
+  def validate(records: Array[R]) {
+    var i = 0
+    while (i < records.length) {
+      validate(records(i))
+      i += 1
+    }
+  }
+
   /**
    * Skips the validation and performs `INSERT` statement for this record.
    * If no `fields` specified, performs full insert (except empty fields
@@ -402,20 +415,22 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def insert_!(record: R, fields: Field[_]*): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
-    else transactionManager.dml{conn =>
-      val fs: Seq[Field[_]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
-      val sql = dialect.insertRecord(this, fs)
-      sqlLog.debug(sql)
-      auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
-        setParams(record, st, fs)
-        val rows = st.executeUpdate
-        val keys = st.getGeneratedKeys
-        if (rows > 0 && keys.next) {
-          val latestId = keys.getLong(1)
-          // refresh latestId for this record
-          updateCache(latestId, record)
+    else {
+      transactionManager.dml{conn =>
+        val fs: Seq[Field[_]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
+        val sql = dialect.insertRecord(this, fs)
+        sqlLog.debug(sql)
+        auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
+          setParams(record, st, fs)
+          val rows = st.executeUpdate
+          val keys = st.getGeneratedKeys
+          if (rows > 0 && keys.next) {
+            val latestId = keys.getLong(1)
+            // refresh latestId for this record
+            updateCache(latestId, record)
+          }
+          rows
         }
-        rows
       }
     }
   }
@@ -435,34 +450,35 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       if (records.length == 0) return 0
-
       transactionManager.dml{conn =>
         val fs = this.fields.filter(_ != id)
         val sql = dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
-          for (record <- records) {
-            setParams(record, st, fs)
+          var i = 0
+          while (i < records.length) {
+            setParams(records(i), st, fs)
             st.addBatch
+            i += 1
           }
+
           val rows = st.executeBatch
           val keys = st.getGeneratedKeys
           var count = 0
           // RETURN_GENERATED_KEYS returns only one id (the first or the last)
           var keyId = if (keys.next) keys.getLong(1) else -1
           val idIsOfTheLastRecord = dialect.returnGeneratedKeysIsTheLast
-          var i = if (idIsOfTheLastRecord) rows.length - 1 else 0
-          while (i >= 0 && i < rows.length) {
-            val row = rows(i)
-            if (row > 0) {
+          var j = if (idIsOfTheLastRecord) rows.length - 1 else 0
+          while (j >= 0 && j < rows.length) {
+            if (rows(j) > 0) {
               count += 1
               if (keyId > 0) {
                 // refresh id for this record
-                updateCache(keyId, records(i))
+                updateCache(keyId, records(j))
                 if (idIsOfTheLastRecord) keyId -= 1 else keyId += 1
               }
             }
-            if (idIsOfTheLastRecord) i -= 1 else i += 1
+            if (idIsOfTheLastRecord) j -= 1 else j += 1
           }
           count
         }
@@ -471,7 +487,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   }
 
   def insertBatch(records: Array[R]): Int = {
-    records foreach validate
+    validate(records)
     insertBatch_!(records)
   }
 
@@ -483,14 +499,16 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def update_!(record: R, fields: Field[_]*): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
-    else transactionManager.dml{conn =>
-      val fs: Seq[Field[_]] = if (fields.size == 0) _fields.filter(f => f != id) else fields
-      val sql = dialect.updateRecord(this, fs)
-      sqlLog.debug(sql)
-      auto(conn.prepareStatement(sql)){st =>
-        setParams(record, st, fs)
-        typeConverter.write(st, idOf(record), fs.size + 1)
-        st.executeUpdate
+    else {
+      transactionManager.dml{conn =>
+        val fs: Seq[Field[_]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
+        val sql = dialect.updateRecord(this, fs)
+        sqlLog.debug(sql)
+        auto(conn.prepareStatement(sql)){st =>
+          setParams(record, st, fs)
+          typeConverter.write(st, idOf(record), fs.size + 1)
+          st.executeUpdate
+        }
       }
     }
   }
@@ -508,33 +526,40 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def updateBatch_!(records: Array[R], fields: Field[_]*): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
-    else transactionManager.dml{conn =>
-      val fs: Seq[Field[_]] = if (fields.size == 0) _fields.filter(f => f != id) else fields
-      val sql = dialect.updateRecord(this, fs)
-      sqlLog.debug(sql)
-      auto(conn.prepareStatement(sql)){st =>
-        for (record <- records) {
-          setParams(record, st, fs)
-          typeConverter.write(st, idOf(record), fs.size + 1)
-          st.addBatch
-        }
-        val rows = st.executeBatch
-        var count = 0
-        var i = 0
-        while (i < rows.length) {
-          val row = rows(i)
-          if (row > 0) {
-            count += 1
+    else {
+      if (records.length == 0) return 0
+      transactionManager.dml{conn =>
+        val fs: Seq[Field[_]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
+        val sql = dialect.updateRecord(this, fs)
+        sqlLog.debug(sql)
+        auto(conn.prepareStatement(sql)){st =>
+          val paramIdx = fs.size + 1
+          var i = 0
+          while (i < records.length) {
+            val record = records(i)
+            setParams(record, st, fs)
+            typeConverter.write(st, idOf(record), paramIdx)
+            st.addBatch
+            i += 1
           }
-          i += 1
+        
+          val rows = st.executeBatch
+          var count = 0
+          var j = 0
+          while (j < rows.length) {
+            if (rows(j) > 0) {
+              count += 1
+            }
+            j += 1
+          }
+          count
         }
-        count
       }
     }
   }
 
   def updateBatch(records: Array[R], fields: Field[_]*): Int = {
-    records foreach validate
+    validate(records)
     updateBatch_!(records, fields: _*)
   }
 
@@ -545,12 +570,14 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def delete_!(record: R): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
-    else transactionManager.dml{conn =>
-      val sql = dialect.deleteRecord(this)
-      sqlLog.debug(sql)
-      auto(conn.prepareStatement(sql)){st =>
-        typeConverter.write(st, idOf(record), 1)
-        st.executeUpdate
+    else {
+      transactionManager.dml{conn =>
+        val sql = dialect.deleteRecord(this)
+        sqlLog.debug(sql)
+        auto(conn.prepareStatement(sql)){st =>
+          typeConverter.write(st, idOf(record), 1)
+          st.executeUpdate
+        }
       }
     }
   }
