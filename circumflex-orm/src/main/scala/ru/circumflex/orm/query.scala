@@ -108,7 +108,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
    * A holder to hold strong references of records that were created during this query,
    * so these records won't be GCed and can be reached by lazyFetchers
    */
-  protected[orm] val recordsHolder = ListBuffer[AnyRef]()
+  protected[orm] val recordsHolder = ListBuffer[Any]()
 
   private def applyLazyFetchers {
     lazyFetchers foreach (_.apply())
@@ -307,8 +307,9 @@ class Select[T](projection: Projection[T]) extends SQLQuery[T](projection) {
    * Search deeply for a projection that matches specified `predicate` function.
    */
   protected def findProjection(projection: Projection[_],
-                               predicate: Projection[_] => Boolean): Option[Projection[_]] =
-                                 if (predicate(projection)) return Some(projection)
+                               predicate: Projection[_] => Boolean
+  ): Option[Projection[_]] =
+    if (predicate(projection)) return Some(projection)
   else projection match {
     case p: CompositeProjection[_] =>
       return p.subProjections.find(predicate)
@@ -419,8 +420,8 @@ class NativeDMLQuery(expression: ParameterizedExpression) extends DMLQuery {
  *
  * The projections of `query` must match the columns of target `relation`.
  */
-class InsertSelect[R <: AnyRef](val relation: Relation[R],
-                                val query: SQLQuery[_]
+class InsertSelect[R](val relation: Relation[R],
+                      val query: SQLQuery[_]
 ) extends DMLQuery {
   if (relation.readOnly_?)
     throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
@@ -431,7 +432,7 @@ class InsertSelect[R <: AnyRef](val relation: Relation[R],
 /**
  * A lil helper to keep stuff DSL'ly.
  */
-class InsertSelectHelper[R <: AnyRef](val relation: Relation[R]) {
+class InsertSelectHelper[R](val relation: Relation[R]) {
   def select[T](projection: Projection[T]) = new InsertSelect(relation, new Select(projection))
   def SELECT[T](projection: Projection[T]) = select(projection)
 }
@@ -441,7 +442,7 @@ class InsertSelectHelper[R <: AnyRef](val relation: Relation[R]) {
 /**
  * Functionality for DELETE query.
  */
-class Delete[R <: AnyRef](val node: RelationNode[R]) extends DMLQuery {
+class Delete[R](val node: RelationNode[R]) extends DMLQuery {
   val relation = node.relation
   if (relation.readOnly_?)
     throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
@@ -466,29 +467,29 @@ class Delete[R <: AnyRef](val node: RelationNode[R]) extends DMLQuery {
 /**
  * Functionality for UPDATE query.
  */
-class Update[R <: AnyRef](val node: RelationNode[R]) extends DMLQuery {
+class Update[R](val node: RelationNode[R]) extends DMLQuery {
   val relation = node.relation
   if (relation.readOnly_?)
     throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
 
   // ### SET clause
 
-  private var _setClause: Seq[Pair[Field[_], Any]] = Nil
+  private var _setClause: Seq[Pair[Field[R, _], Any]] = Nil
   def setClause = _setClause
-  def set[T](field: Field[_], value: Any): Update[R] = {
+  def set[T](field: Field[R, _], value: Any): Update[R] = {
     _setClause ++= List(field -> value)
     return this
   }
-  def SET[T](field: Field[_], value: Any): Update[R] = set(field, value)
-  def set[F <: AnyRef](association: Association[R, F], value: F): Update[R] =
+  def SET[T](field: Field[R, _], value: Any): Update[R] = set(field, value)
+  def set[F](association: Association[R, F], value: F): Update[R] =
     set(association.field, association.foreignRelation.idOf(value))
-  def SET[P <: AnyRef](association: Association[R, P], value: P): Update[R] =
+  def SET[P](association: Association[R, P], value: P): Update[R] =
     set(association, value)
-  def setNull[T](field: Field[_]): Update[R] = set(field, null.asInstanceOf[T])
-  def SET_NULL[T](field: Field[_]): Update[R] = setNull(field)
-  def setNull[P <: AnyRef](association: Association[R, P]): Update[R] =
+  def setNull[T](field: Field[R, _]): Update[R] = set(field, null.asInstanceOf[T])
+  def SET_NULL[T](field: Field[R, _]): Update[R] = setNull(field)
+  def setNull[P](association: Association[R, P]): Update[R] =
     setNull(association.field)
-  def SET_NULL[P <: AnyRef](association: Association[R, P]): Update[R] =
+  def SET_NULL[P](association: Association[R, P]): Update[R] =
     setNull(association)
 
   // ### WHERE clause

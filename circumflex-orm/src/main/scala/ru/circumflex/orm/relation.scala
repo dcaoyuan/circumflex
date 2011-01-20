@@ -5,8 +5,8 @@ import JDBC._
 import java.sql.Statement
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
 import org.aiotrade.lib.util.config.Config
+import java.lang.reflect.Method
 import java.sql.PreparedStatement
-import scala.collection.mutable.ListBuffer
 
 // ## Relations registry
 
@@ -19,13 +19,13 @@ object RelationRegistry {
 
   protected var classToRelation: Map[Class[_], Relation[_]] = Map()
 
-  def getRelation[R <: AnyRef](r: R): Relation[R] =
-    classToRelation.get(r.getClass) match {
+  def getRelation[R](r: R): Relation[R] =
+    classToRelation.get(r.asInstanceOf[AnyRef].getClass) match {
       case Some(rel: Relation[R]) => rel
       case _ => {
-          val relClass = Config.loadClass[Relation[R]](r.getClass.getName + "$")
+          val relClass = Config.loadClass[Relation[R]](r.asInstanceOf[AnyRef].getClass.getName + "$")
           val relation = relClass.getField("MODULE$").get(null).asInstanceOf[Relation[R]]
-          classToRelation += (r.getClass -> relation)
+          classToRelation += (r.asInstanceOf[AnyRef].getClass -> relation)
           relation
         }
     }
@@ -35,8 +35,10 @@ object RelationRegistry {
 
 // ## Relation
 
-abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
+abstract class Relation[R](implicit m: Manifest[R]) {
 
+  protected var _initialized = false
+  
   /**
    * Now this thingy is very useful and very light:
    * it translates every `ThisKindOfIdentifiers`
@@ -46,8 +48,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
   // ### Implicits
 
-  implicit def str2ddlHelper(name: String): DefinitionHelper[R] =
-    new DefinitionHelper(this, name)
+  implicit def str2ddlHelper(name: String): DefinitionHelper[R] = new DefinitionHelper(this, name)
 
   // ### Commons
 
@@ -63,11 +64,14 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
   private var recordToId = WeakIdentityBiHashMap[R, Long]()
 
-  protected[orm] var _fields: Seq[Field[_]] = ListBuffer()
-  protected[orm] var _associations: Seq[Association[R, _]] = ListBuffer()
-  protected[orm] var _constraints: Seq[Constraint] = ListBuffer()
-  protected[orm] var _preAux: Seq[SchemaObject] = ListBuffer()
-  protected[orm] var _postAux: Seq[SchemaObject] = ListBuffer()
+
+  protected var _fieldToRecField: Map[Field[R, _], ClassVariable[R, _]] = Map()
+  protected var _fields: Seq[Field[R, _]] = Nil
+  protected var _associations: Seq[Association[R, _]] = Nil
+  protected var _constraints: Seq[Constraint[R]] = Nil
+  protected var _indexes: Seq[Index[R]] = Nil
+  protected var _preAux: Seq[SchemaObject] = Nil
+  protected var _postAux: Seq[SchemaObject] = Nil
 
   /**
    * Unique identifier based on `recordClass` to identify this relation
@@ -95,70 +99,46 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    */
   val qualifiedName = dialect.relationQualifiedName(this)
 
+  val validator = new RecordValidator(this)
+
   /**
    * id field of this relation.
    */
-  val id = new PrimaryKeyField(this)
+  val id = new AutoPrimaryKeyField(this)
 
   /**
    * Primary key field of this relation.
    */
-  val primaryKey = id
-
-  val validator = new RecordValidator(this)
+  def PRIMARY_KEY: Field[R, _] = id
 
   /**
    * Inspect `recordClass` to find fields and constraints definitions.
    */
-  private lazy val fieldToRecField: Map[Field[_], ClassVariable[_]] = {
-    var res = Map[Field[_], ClassVariable[_]]()
-    ClassUtil.getValDefs(getClass) foreach {getter =>
-      getter.getReturnType match {
-        case tpe if classOf[Field[_]].isAssignableFrom(tpe) =>
-          val field = getter.invoke(this).asInstanceOf[Field[_]]
-          if (field == null) {
-            ormLog.warning("Cannot get field val: " + getter)
-          } else {
-            recordFields find (_.name == getter.getName) match {
-              case Some(recField) => res += (field -> recField)
-              case None =>
-            }
-          }
-        case tpe if classOf[Association[R, _]].isAssignableFrom(tpe) =>
-          val assoc = getter.invoke(this).asInstanceOf[Association[R, _]]
-          if (assoc == null) {
-            ormLog.warning("Cannot get field val: " + getter)
-          } else {
-            recordFields find (_.name == getter.getName) match {
-              case Some(recField) => res += (assoc.field -> recField)
-              case None =>
-            }
-          }
-        case tpe if classOf[InverseAssociation[_, R]].isAssignableFrom(tpe) =>
-        case _ =>
-      }
-    }
-    res
+  def recFieldOf(field: Field[R, _]): Option[ClassVariable[R, _]] = {
+    init
+    _fieldToRecField.get(field)
   }
 
-  def recFieldOf(field: Field[_]): Option[ClassVariable[_]] = {
-    fieldToRecField.get(field)
+  def fields: Seq[Field[R, _]] = {
+    init
+    _fields
   }
 
-
-  def fields: Seq[Field[_]] = _fields
-  protected[orm] def addField(field: Field[_]) {
-    _fields :+= field
-    if (field.unique_?) unique(field)
+  def associations: Seq[Association[R, _]] = {
+    init
+    _associations
   }
 
-  def associations: Seq[Association[R, _]] = _associations
-  protected[orm] def addAssociation(assoc: Association[R, _]) {
-    _associations :+= assoc
-    _constraints  :+= associationFK(assoc)
+  def constraints: Seq[Constraint[R]] = {
+    init
+    _constraints
   }
 
-  def constraints: Seq[Constraint] = _constraints
+  def indexes: Seq[Index[R]] = {
+    init
+    _indexes
+  }
+
   def preAux: Seq[SchemaObject] = _preAux
   def postAux: Seq[SchemaObject] = _postAux
 
@@ -247,25 +227,64 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   /**
    * Try to find an association to specified `relation`.
    */
-  def findAssociation[F <: AnyRef](relation: Relation[F]): Option[Association[R, F]] =
+  def findAssociation[F](relation: Relation[F]): Option[Association[R, F]] =
     associations.find(_.foreignRelation == relation).asInstanceOf[Option[Association[R, F]]]
 
-  private def associationFK(assoc: Association[_, _]): ForeignKey = {
-    val name = relationName + "_" + assoc.name + "_fkey"
-    new ForeignKey(this,
-                   name,
-                   assoc.foreignRelation,
-                   List(assoc.field),
-                   List(assoc.foreignRelation.primaryKey),
-                   assoc.onDelete,
-                   assoc.onUpdate)
+
+  private def findMembers(cl: Class[_]) {
+    ClassUtil.getValDefs(getClass) foreach processMember
   }
 
-  /**
-   * Allow dialects to override the initialization logic.
-   */
-  dialect.initializeRelation(this)
+  private def processMember(getter: Method) {
+    val cl = getter.getReturnType
+    if (classOf[Field[R, _]].isAssignableFrom(cl)) {
+      val field = getter.invoke(this).asInstanceOf[Field[R, _]]
+      this._fields :+= field
+      if (field.unique_?) UNIQUE(field)
+      recordFields find (_.name == getter.getName) foreach {recField => this._fieldToRecField += (field -> recField)}
+    } else if (classOf[Association[R, _]].isAssignableFrom(cl)) {
+      val assoc = getter.invoke(this).asInstanceOf[Association[R, _]]
+      this._associations :+= assoc
+      this._constraints  :+= associationFK(assoc)
+      this._fields :+= assoc.field
+      if (assoc.unique_?) UNIQUE(assoc.field)
+      recordFields find (_.name == getter.getName) foreach {recField => this._fieldToRecField += (assoc.field -> recField)}
+    } else if (classOf[Constraint[R]].isAssignableFrom(cl)) {
+      val c = getter.invoke(this).asInstanceOf[Constraint[R]]
+      this._constraints :+= c
+    } else if (classOf[Index[R]].isAssignableFrom(cl)) {
+      val i = getter.invoke(this).asInstanceOf[Index[R]]
+      this._indexes :+= i
+    }
+  }
 
+
+  private def associationFK(a: Association[R, _]): ForeignKey[R] = {
+    CONSTRAINT(relationName + "_" + a.name + "_fkey")
+    .FOREIGN_KEY(a.field)
+    .REFERENCES(a.foreignRelation, a.foreignRelation.PRIMARY_KEY)
+    .ON_DELETE(a.onDelete)
+    .ON_UPDATE(a.onUpdate)
+  }
+
+  protected[orm] def init {
+    if (!_initialized) this.synchronized {
+      if (!_initialized) try {
+        findMembers(this.getClass)
+        dialect.initializeRelation(this)
+        this._fields foreach dialect.initializeField
+        this._initialized = true
+      } catch {
+        case e: NullPointerException =>
+          throw new ORMException("Failed to initialize " + relationName + ": " +
+                                 "possible cyclic dependency between relations. " +
+                                 "Make sure that at least one side uses weak reference to another " +
+                                 "(change `val` to `lazy val` for fields and to `def` for inverse associations).", e)
+        case e: Exception =>
+          throw new ORMException("Failed to initialize " + relationName + ".", e)
+      }
+    }
+  }
 
   // ### Simple queries
 
@@ -293,58 +312,30 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
   // ### Definitions
 
-  /**
-   * A helper for creating named constraints.
-   */
-  protected[orm] def constraint(name: String): ConstraintHelper =
-    new ConstraintHelper(this, name)
-  protected[orm] def CONSTRAINT(name: String): ConstraintHelper = constraint(name)
-
-  /**
-   * Add a unique constraint to this relation's definition.
-   */
-  protected[orm] def unique(fields: Field[_]*): UniqueKey =
-    constraint(relationName + "_" + fields.map(_.name).mkString("_") + "_key").unique(fields: _*)
-  protected[orm] def UNIQUE(fields: Field[_]*) = unique(fields: _*)
-
-  /**
-   * Add a foreign key constraint to this relation's definition.
-   */
-  def foreignKey(localFields: Field[_]*): ForeignKeyHelper =
-    new ForeignKeyHelper(this, relationName + "_" +
-                         localFields.map(_.name).mkString("_") + "_fkey", localFields)
-  def FOREIGN_KEY(localFields: Field[_]*): ForeignKeyHelper = foreignKey(localFields: _*)
+  protected def CONSTRAINT(name: String): ConstraintHelper[R] = new ConstraintHelper(this, name)
+  protected def UNIQUE(fields: Field[R, _]*) =
+    CONSTRAINT(relationName + "_" + fields.map(_.name).mkString("_") + "_key").UNIQUE(fields: _*)
 
   /**
    * Inverse associations.
    */
-  def inverse[C <: AnyRef](association: Association[C, R]): InverseAssociation[R, C] =
-    new InverseAssociation(association)
-
-  /**
-   * Add an index to this relation's definition.
-   */
-  def index(indexName: String, expressions: String*): Index = {
-    val idx = new Index(this, indexName, expressions: _*)
-    addPostAux(idx)
-    return idx
-  }
-  def INDEX(indexName: String, expressions: String*): Index = index(indexName, expressions: _*)
+  def inverse[C](association: Association[C, R]): InverseAssociation[R, C] =
+    new InverseAssociation[R, C](association)
 
   /**
    * Add specified `objects` to this relation's `preAux` queue.
    */
   def addPreAux(objects: SchemaObject*): this.type = {
-    objects.foreach(o => if (!_preAux.contains(o)) _preAux :+= o)
-    return this
+    _preAux ++= (objects filter (!_preAux.contains(_)))
+    this
   }
 
   /**
    * Add specified `objects` to this relaion's `postAux` queue.
    */
   def addPostAux(objects: SchemaObject*): this.type = {
-    objects.foreach(o => if (!_postAux.contains(o)) _postAux :+= o)
-    return this
+    _postAux ++= (objects filter (!_postAux.contains(_)))
+    this
   }
 
   // ### Persistence
@@ -352,7 +343,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   /**
    * A helper to set parameters to `PreparedStatement`.
    */
-  protected[orm] def setParams(record: R, st: PreparedStatement, fields: Seq[Field[_]]) = {
+  protected[orm] def setParams(record: R, st: PreparedStatement, fields: Seq[Field[R, _]]) = {
     var i = 0
     while (i < fields.size) {
       typeConverter.write(st, fields(i).getValue(record), i + 1)
@@ -376,7 +367,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
   def refetchLast(record: R, latestId: Long) {
     val root = this
     val latestIdEq = if (latestId != -1)
-      root.alias + "." + primaryKey.name + " = " + latestId
+      root.alias + "." + PRIMARY_KEY.name + " = " + latestId
     else dialect.lastIdExpression(root)
     SELECT (root.*) FROM root WHERE (latestIdEq) unique match {
       case Some(r: R) => copyFields(r, record)
@@ -412,12 +403,12 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    * with default values), otherwise only specified `fields` participate
    * in the statement.
    */
-  def insert_!(record: R, fields: Field[_]*): Int = {
+  def insert_!(record: R, fields: Field[R, _]*): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       transactionManager.dml{conn =>
-        val fs: Seq[Field[_]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
+        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
         val sql = dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
@@ -434,16 +425,16 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
       }
     }
   }
-  def INSERT_!(record: R, fields: Field[_]*): Int = insert_!(record, fields: _*)
+  def INSERT_!(record: R, fields: Field[R, _]*): Int = insert_!(record, fields: _*)
 
   /**
    * Validates record and executes `insert_!` on success.
    */
-  def insert(record: R, fields: Field[_]*): Int = validate(record) match {
+  def insert(record: R, fields: Field[R, _]*): Int = validate(record) match {
     case None => insert_!(record, fields: _*)
     case Some(errors) => throw new ValidationException(errors: _*)
   }
-  def INSERT(record: R, fields: Field[R]*) = insert(record, fields: _*)
+  def INSERT(record: R, fields: Field[R, _]*) = insert(record, fields: _*)
 
   def insertBatch_!(records: Array[R]): Int = {
     if (readOnly_?)
@@ -496,12 +487,12 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
    * If no `fields` specified, performs full update, otherwise only specified
    * `fields` participate in the statement.
    */
-  def update_!(record: R, fields: Field[_]*): Int = {
+  def update_!(record: R, fields: Field[R, _]*): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       transactionManager.dml{conn =>
-        val fs: Seq[Field[_]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
+        val fs: Seq[Field[R, _]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
         val sql = dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
@@ -512,24 +503,24 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
       }
     }
   }
-  def UPDATE_!(record: R, fields: Field[R]*): Int = update_!(record, fields: _*)
+  def UPDATE_!(record: R, fields: Field[R, _]*): Int = update_!(record, fields: _*)
 
   /**
    * Validates record and executes `update_!` on success.
    */
-  def update(record: R, fields: Field[_]*): Int = validate(record) match {
+  def update(record: R, fields: Field[R, _]*): Int = validate(record) match {
     case None => update_!(record, fields: _*)
     case Some(errors) => throw new ValidationException(errors: _*)
   }
-  def UPDATE(record: R, fields: Field[_]*) = update(record, fields: _*)
+  def UPDATE(record: R, fields: Field[R, _]*) = update(record, fields: _*)
 
-  def updateBatch_!(records: Array[R], fields: Field[_]*): Int = {
+  def updateBatch_!(records: Array[R], fields: Field[R, _]*): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       if (records.length == 0) return 0
       transactionManager.dml{conn =>
-        val fs: Seq[Field[_]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
+        val fs: Seq[Field[R, _]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
         val sql = dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
@@ -558,7 +549,7 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
     }
   }
 
-  def updateBatch(records: Array[R], fields: Field[_]*): Int = {
+  def updateBatch(records: Array[R], fields: Field[R, _]*): Int = {
     validate(records)
     updateBatch_!(records, fields: _*)
   }
@@ -648,21 +639,35 @@ abstract class Relation[R <: AnyRef](implicit m: Manifest[R]) {
 
 // ## Table
 
-abstract class Table[R <: AnyRef: Manifest] extends Relation[R] with SchemaObject {
+abstract class Table[R: Manifest] extends Relation[R] with SchemaObject {
   val objectName = "TABLE " + qualifiedName
-  lazy val sqlDrop = dialect.dropTable(this)
-  lazy val sqlCreate = dialect.createTable(this)
+  def sqlDrop = {
+    init
+    dialect.dropTable(this)
+  }
+  
+  def sqlCreate = {
+    init
+    dialect.createTable(this)
+  }
 }
 
 // ## View
 
-abstract class View[R <: AnyRef: Manifest] extends Relation[R] with SchemaObject {
+abstract class View[R: Manifest] extends Relation[R] with SchemaObject {
 
   // ### Miscellaneous
 
   val objectName = "VIEW " + qualifiedName
-  lazy val sqlDrop = dialect.dropView(this)
-  lazy val sqlCreate = dialect.createView(this)
+  def sqlDrop = {
+    init
+    dialect.dropView(this)
+  }
+
+  def sqlCreate = {
+    init
+    dialect.createView(this)
+  }
 
   /**
    * Views are not updatable by default.
@@ -674,50 +679,4 @@ abstract class View[R <: AnyRef: Manifest] extends Relation[R] with SchemaObject
    */
   def query: Select[_]
 
-}
-
-
-// ## Helper for fields DSL
-
-/**
- * A tiny builder that helps to instantiate `Field`s and `Association`s
- * in a neat DSL-like way.
- */
-class DefinitionHelper[R <: AnyRef](relation: Relation[R], name: String) {
-
-  def uuid = relation.getClass.getName + "." + name
-
-  def tinyint = new TinyintField(relation, name, uuid)
-  def integer = new IntField(relation, name, uuid)
-  def bigint = new LongField(relation, name, uuid)
-  def float(precision: Int = -1, scale: Int = 0) = new FloatField(relation, name, uuid, precision, scale)
-  def double(precision: Int = -1, scale: Int = 0) = new DoubleField(relation, name, uuid, precision, scale)
-  def numeric(precision: Int = -1, scale: Int = 0) = new NumericField(relation, name, uuid, precision, scale)
-  def text = new TextField(relation, name, uuid, dialect.textType)
-  def varchar(length: Int = -1) = new TextField(relation, name, uuid, length)
-  def varbinary(length: Int = -1) = new VarbinaryField(relation, name, uuid, length)
-  def serialized[T](tpe: Class[T], length: Int = -1) = new SerializedField[T](relation, name, uuid, tpe, length)
-  def boolean = new BooleanField(relation, name, uuid)
-  def date = new DateField(relation, name, uuid)
-  def time = new TimeField(relation, name, uuid)
-  def timestamp = new TimestampField(relation, name, uuid)
-
-  def TINYINT = tinyint
-  def INTEGER = integer
-  def BIGINT = bigint
-  def FLOAT(precision: Int = -1, scale: Int = 1) = float(precision, scale)
-  def DOUBLE(precision: Int = -1, scale: Int = 1) = double(precision, scale)
-  def NUMERIC(precision: Int = -1, scale: Int = 1) = numeric(precision, scale)
-  def TEXT = text
-  def VARCHAR(length: Int = -1) = varchar(length)
-  def VARBINARY(length: Int = -1) = varbinary(length)
-  def SERIALIZED[T](tpe: Class[T], length: Int = -1) = serialized[T](tpe, length)
-  def BOOLEAN = boolean
-  def DATE = date
-  def TIME = time
-  def TIMESTAMP = timestamp
-
-  def references[F <: AnyRef](toRelation: Relation[F]): Association[R, F] =
-    new Association[R, F](relation, name, uuid, toRelation)
-  def REFERENCES[F <: AnyRef](toRelation: Relation[F]): Association[R, F] = references(toRelation)
 }

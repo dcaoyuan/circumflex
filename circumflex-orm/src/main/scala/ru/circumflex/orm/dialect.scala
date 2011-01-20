@@ -10,8 +10,6 @@ package ru.circumflex.orm
  * implementation in your own class. After that, set the `orm.dialect`
  * configuration parameter accordingly.
  */
-import java.sql.ResultSet
-import scala.collection.mutable.HashMap
 
 object DefaultDialect extends Dialect
 
@@ -38,6 +36,7 @@ class Dialect {
   def dateType = "DATE"
   def timeType = "TIME"
   def timestampType = "TIMESTAMPTZ"
+  def xmlType = "XML"
 
   // ### Actions for foreign keys
 
@@ -122,15 +121,15 @@ class Dialect {
   def quoteLiteral(expr: String) = "'" + expr.replace("'", "''") + "'"
 
   /**
+   * Quotes identifier for dialects that support it.
+   */
+  def quoteIdentifer(identifier: String) = identifier
+
+  /**
    * Qualify relation name with it's schema.
    */
   def relationQualifiedName(relation: Relation[_]) =
     relation.schema.name + "." + relation.relationName
-
-  /**
-   * Just prepend specified expression with `DEFAULT` keyword.
-   */
-  def defaultExpression(expr: String) = "DEFAULT " + expr
 
   /**
    * Just append `AS` and specified `alias` to specified `expression`.
@@ -140,7 +139,7 @@ class Dialect {
   /**
    * Qualify a column with table alias (e.g. "p.id")
    */
-  def qualifyColumn(field: Field[_], tableAlias: String) =
+  def qualifyColumn(field: Field[_, _], tableAlias: String) =
     tableAlias + "." + field.name
 
   /**
@@ -166,7 +165,7 @@ class Dialect {
    * Produce a full definition of constraint (prepends the specific definition
    * with `CONSTRAINT` keyword and constraint name.
    */
-  def constraintDefinition(constraint: Constraint) =
+  def constraintDefinition(constraint: Constraint[_]) =
     "CONSTRAINT " + constraint.constraintName + " " + constraint.sqlDefinition
 
   /**
@@ -178,13 +177,13 @@ class Dialect {
   /**
    * Produce `ALTER TABLE` statement with `ADD CONSTRAINT` action.
    */
-  def alterTableAddConstraint(constraint: Constraint) =
+  def alterTableAddConstraint(constraint: Constraint[_]) =
     alterTable(constraint.relation, "ADD " + constraintDefinition(constraint));
 
   /**
    * Produce `ALTER TABLE` statement with `DROP CONSTRAINT` action.
    */
-  def alterTableDropConstraint(constraint: Constraint) =
+  def alterTableDropConstraint(constraint: Constraint[_]) =
     alterTable(constraint.relation, "DROP CONSTRAINT " + constraint.constraintName);
 
   /**
@@ -209,7 +208,7 @@ class Dialect {
   def createTable(table: Table[_]) = (
     "CREATE TABLE " + table.qualifiedName + " (" +
     table.fields.map(_.toSql).mkString(", ") +
-    ", PRIMARY KEY (" + table.primaryKey.name + "))"
+    ", PRIMARY KEY (" + table.PRIMARY_KEY.name + "))"
   )
   /**
    * Produce `DROP TABLE` statement.
@@ -234,7 +233,7 @@ class Dialect {
   /**
    * Produce `CREATE INDEX` statement.
    */
-  def createIndex(idx: Index): String = {
+  def createIndex(idx: Index[_]): String = {
     "CREATE " + (if (idx.unique_?) "UNIQUE " else "") +
     "INDEX " + idx.name + " ON " + idx.relation.qualifiedName + " (" + idx.expression + ")" +
     " USING " + idx.using +
@@ -244,19 +243,22 @@ class Dialect {
   /**
    * Produce `DROP INDEX` statement.
    */
-  def dropIndex(idx: Index) = "DROP INDEX " + idx.name + " ON " + idx.relation.qualifiedName
+  def dropIndex(idx: Index[_]) = "DROP INDEX " + idx.name + " ON " + idx.relation.qualifiedName
+
+  def createSequence(seq: Sequence) =
+    "CREATE SEQUENCE " + seq.name
+
+  def dropSequence(seq: Sequence) =
+    "DROP SEQUENCE " + seq.name
 
   /**
    * SQL definition for a column represented by specified `field`
    * (e.g. `mycolumn VARCHAR NOT NULL`).
    */
-  def columnDefinition(field: Field[_]): String = {
+  def columnDefinition(field: Field[_, _]): String = {
     var result = field.name + " " + field.sqlType
-    if (!field.nullable_?) result += " NOT NULL"
-    field.default match {
-      case Some(expr) => result += " " + expr
-      case _ =>
-    }
+    if (field.notNull_?) result += " NOT NULL"
+    result += defaultExpression(field)
     return result
   }
 
@@ -266,36 +268,45 @@ class Dialect {
    * This implementation adds an auxiliary sequence for primary key
    * (sequences are supported by PostgreSQL, Oracle and DB2 dialects).
    */
-  def initializeRelation(relation: Relation[_]): Unit = {
-    val seqName = pkSequenceName(relation)
-    val seq = new SchemaObject {
-      val objectName = "SEQUENCE " + seqName
-      val sqlDrop = "DROP SEQUENCE " + seqName
-      val sqlCreate = "CREATE SEQUENCE " + seqName
+  def initializeRelation(relation: Relation[_]): Unit = {}
+
+  /**
+   * Performs dialect-specific field initialization.
+   */
+  def initializeField(field: Field[_, _]) {
+    field match {
+      case f: AutoIncrementable[_, _] if f.autoIncrement_? && !field.relation.isInstanceOf[View[_]] =>
+        val seqName = sequenceName(f)
+        val seq = new Sequence(seqName)
+        f.relation.addPreAux(seq)
+      case _ =>
     }
-    relation.addPreAux(seq)
   }
 
   /**
-   * An expression for primary key column.
+   * Produces a `DEFAULT` expression for specified `field`.
    */
-  def primaryKeyExpression(relation: Relation[_]) =
-    "DEFAULT NEXTVAL('" + pkSequenceName(relation) + "')"
+  def defaultExpression(field: Field[_, _]): String = field match {
+    case a: AutoIncrementable[_, _] if a.autoIncrement_? => " DEFAULT NEXTVAL('" + sequenceName(field) + "')"
+    case _ => field.defaultExpression.map(" DEFAULT " + _).getOrElse("")
+  }
 
-  protected def pkSequenceName(relation: Relation[_]) =
-    relation.qualifiedName + "_" + relation.primaryKey.name + "_seq"
-
+  protected def sequenceName(f: Field[_, _]): String = {
+    quoteIdentifer(f.relation.schema.name) + "." +
+    quoteIdentifer(f.relation.relationName + "_" + f.name + "_seq")
+  }
+  
   /**
    * Produce unique constraint definition (e.g. `UNIQUE (name, value)`).
    */
-  def uniqueKeyDefinition(uniq: UniqueKey) =
+  def uniqueKeyDefinition(uniq: UniqueKey[_]) =
     "UNIQUE (" + uniq.fields.map(_.name).mkString(", ") + ")"
 
   /**
    * Produce foreign key constraint definition for association (e.g.
    * `FOREIGN KEY (country_id) REFERENCES country(id) ON DELETE CASCADE`).
    */
-  def foreignKeyDefinition(fk: ForeignKey) = (
+  def foreignKeyDefinition(fk: ForeignKey[_]) = (
     "FOREIGN KEY (" + fk.localFields.map(_.name).mkString(", ") +
     ") REFERENCES " + fk.foreignRelation.qualifiedName + " (" +
     fk.foreignFields.map(_.name).mkString(", ") + ") " +
@@ -305,13 +316,13 @@ class Dialect {
   /**
    * Produces check constraint definition (e.g. `CHECK (index > 0)`).
    */
-  def checkConstraintDefinition(check: CheckConstraint) =
+  def checkConstraintDefinition(check: CheckConstraint[_]) =
     "CHECK (" + check.expression + ")"
 
   // ### SQL
 
   def lastIdExpression(node: RelationNode[_]) =
-    node.alias + "." + node.relation.primaryKey.name + " = LASTVAL()"
+    node.alias + "." + node.relation.PRIMARY_KEY.name + " = LASTVAL()"
 
   /**
    * Produce SQL representation of joined tree of relations (`JoinNode` instance).
@@ -362,13 +373,32 @@ class Dialect {
       result += " OFFSET " + q.offset
     return result
   }
+
+  /**
+   * Returns a predicate expression for querying the last inserted record
+   * for `IdentityGenerator`.
+   */
+  def identityLastIdPredicate[T](node: RelationNode[T]): Predicate =
+    new SimpleExpression(node.alias + "." + node.relation.PRIMARY_KEY.name + " = LASTVAL()", Nil)
+
+  /**
+   * Returns a query which retrieves the last generated identity value for `IdentityGenerator`.
+   */
+  def identityLastIdQuery[T](node: RelationNode[T]): SQLQuery[T] =
+    new Select(expr[T]("LASTVAL()"))
+
+  /**
+   * Returns a query which retrieves the next sequence value for the primary key of specified `node`.
+   */
+  def sequenceNextValQuery[T](node: RelationNode[T]): SQLQuery[T] =
+    new Select(expr[T]("NEXTVAL('" + sequenceName(node.relation.PRIMARY_KEY) + "')"))
   
-  // ### DML
+  /*!## Data Manipulation Language */
 
   /**
    * Produce `INSERT INTO .. VALUES` statement for specified `record` and specified `fields`.
    */
-  def insertRecord(relation: Relation[_], fields: Seq[Field[_]]) =
+  def insertRecord(relation: Relation[_], fields: Seq[Field[_, _]]) =
     "INSERT INTO " + relation.qualifiedName +
   " (" + fields.map(_.name).mkString(", ") +
   ") VALUES (" + fields.map(f => "?").mkString(", ") + ")"
@@ -377,7 +407,7 @@ class Dialect {
    * Produce `UPDATE` statement with primary key criteria for specified `record` using specified
    * `fields` in the `SET` clause.
    */
-  def updateRecord(relation: Relation[_], fields: Seq[Field[_]]): String =
+  def updateRecord(relation: Relation[_], fields: Seq[Field[_, _]]): String =
     "UPDATE " + relation.qualifiedName +
   " SET " + fields.map(_.name + " = ?").mkString(", ") +
   " WHERE " + relation.id.name + " = ?"

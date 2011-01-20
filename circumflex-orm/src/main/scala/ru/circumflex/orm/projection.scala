@@ -98,8 +98,8 @@ class ExpressionProjection[T](val expression: String) extends AtomicProjection[T
 /**
  * A projection for single field of a record.
  */
-class FieldProjection[T, R <: AnyRef](val node: RelationNode[R],
-                                      val field: Field[T]
+class FieldProjection[T, R](val node: RelationNode[R],
+                            val field: Field[R, T]
 ) extends AtomicProjection[T] {
 
   /**
@@ -123,15 +123,15 @@ class FieldProjection[T, R <: AnyRef](val node: RelationNode[R],
 /**
  * A projection for reading entire `Record`.
  */
-class RecordProjection[R <:AnyRef](val node: RelationNode[R]) extends CompositeProjection[R] {
+class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection[R] {
   private type FP = FieldProjection[Any, R]
 
 //  protected val _fieldProjections: Seq[FP] =
 //    node.relation.fields.map(f => new FieldProjection(node, f.asInstanceOf[Field[Any]]))
 
   val (pkProjection, otherProjections) = ((None: Option[FP], Nil: List[FP]) /: node.relation.fields) {(acc, f) =>
-    val p = new FieldProjection(node, f.asInstanceOf[Field[Any]])
-    if (f == node.relation.primaryKey)
+    val p = new FieldProjection(node, f.asInstanceOf[Field[R, Any]])
+    if (f == node.relation.PRIMARY_KEY)
       (Some(p), acc._2)
     else
       (acc._1, p :: acc._2)

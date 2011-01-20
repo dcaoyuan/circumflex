@@ -18,11 +18,11 @@ class Country extends Record[Country] {
 
 object Country extends Table[Country] {
   val code = "code" VARCHAR(2) DEFAULT("'ch'")
-  val name = "name" TEXT
+  val name = "name" TEXT() DEFAULT("'ch'")
   // Inverse associations
   //val cities = inverse(City.country)
 
-  INDEX("country_code_idx", "LOWER(code)") USING "btree" UNIQUE
+  val codeIdx = "country_code_idx" INDEX("LOWER(code)") USING "btree" UNIQUE
 
   // Validations
 //  validation.notEmpty(code)
@@ -49,7 +49,7 @@ object City extends Table[City] {
   // Fields
   val name = "name" TEXT
   // Associations
-  val country = "country_id" REFERENCES(Country) ON_DELETE CASCADE ON_UPDATE CASCADE
+  val country = "country_id" BIGINT() REFERENCES(Country) ON_DELETE CASCADE ON_UPDATE CASCADE
 
   // Validations
 //  validation.notEmpty(name)
@@ -70,15 +70,14 @@ class Capital extends Record[Capital] {
 
 object Capital extends Table[Capital] {
   // Associations
-  val country = "country_id" REFERENCES(Country) ON_DELETE CASCADE
-  val city = "city_id" REFERENCES(City) ON_DELETE RESTRICT
-  UNIQUE (country)
-  UNIQUE (city)
+  val country = "country_id".BIGINT REFERENCES(Country) ON_DELETE CASCADE
+  val city = "city_id" BIGINT() REFERENCES(City) ON_DELETE RESTRICT
+  val countryKey = UNIQUE(country)
+  val cityKey = UNIQUE(city)
 }
 
 object Sample {
-  def schema = new DDLUnit(City, Capital, Country).dropCreate
-      .messages.foreach(msg => println(msg.body))
+  def schema = new DDLUnit(City, Capital, Country).dropCreate.messages.foreach(msg => println(msg.body))
   def selects = {
     val ci = City
     val co = Country

@@ -10,8 +10,7 @@ package ru.circumflex.orm
  * Criteria API is designed to operate on `Record`s specifically. If
  * you want to use different projections, use `Select` instead.
  */
-class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
-                                                              with Cloneable {
+class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable {
 
   private var _counter = 0
   protected def nextCounter: Int = {
@@ -55,7 +54,7 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
    * Attempt to search the root tree of query plan for relations of specified `association`
    * and correspondingly update it if necessary.
    */
-  protected def updateRootTree[N <: AnyRef, P <: AnyRef, C <: AnyRef](
+  protected def updateRootTree[N, P, C](
     node: RelationNode[N],
     association: Association[C, P]): RelationNode[N] =
       node match {
@@ -74,8 +73,8 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
   /**
    * Prepare specified `node` and `association` to participate in prefetching.
    */
-  protected def preparePf[N <: AnyRef](relation: Relation[N],
-                                       association: Association[_, _]): RelationNode[N] = {
+  protected def preparePf[N](relation: Relation[N],
+                             association: Association[_, _]): RelationNode[N] = {
     val node = relation.as("pf_" + nextCounter)
     _projections ++= List(node.*)
     _prefetchSeq ++= List[Association[_,_]](association)
@@ -85,9 +84,10 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
   /**
    * Perform a depth-search and add specified `node` to specified `tree` of joins.
    */
-  protected def updateJoinTree[N <: AnyRef](node: RelationNode[N],
-                                            tree: RelationNode[R]): RelationNode[R] =
-                                              tree match {
+  protected def updateJoinTree[N](node: RelationNode[N],
+                                  tree: RelationNode[R]
+  ): RelationNode[R] =
+    tree match {
       case j: JoinNode[R, R] => try {   // try the left side
           j.replaceLeft(updateJoinTree(node, j.left))
         } catch {
@@ -101,7 +101,7 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
    * Extract the information for inverse associations from specified `tuple` using
    * specified `tree`, which should appear to be a subtree of query plan.
    */
-  protected def processTupleTree[N <: AnyRef, P <: AnyRef, C <: AnyRef](
+  protected def processTupleTree[N, P, C](
     tuple: Array[_], tree: RelationNode[N]): Unit =
       tree match {
       case j: OneToManyJoin[P, C] =>
@@ -174,7 +174,7 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
   /**
    * Add specified `association` to prefetch list.
    */
-  def prefetch[P <: AnyRef, C <: AnyRef](association: Association[C, P]): Criteria[R] = {
+  def prefetch[P, C](association: Association[C, P]): Criteria[R] = {
     if (!_prefetchSeq.contains(association)) {
       // The depth-search is used to update query plan if possible.
       _rootTree = updateRootTree(_rootTree, association)
@@ -186,7 +186,7 @@ class Criteria[R <: AnyRef](val rootNode: RelationNode[R]) extends SQLable
   /**
    * Add specified `node` to join tree so that you can build queries with transitive criteria.
    */
-  def addJoin[N <: AnyRef](node: RelationNode[N]): Criteria[R] = {
+  def addJoin[N](node: RelationNode[N]): Criteria[R] = {
     _joinTree = updateJoinTree(node, _joinTree)
     return this
   }

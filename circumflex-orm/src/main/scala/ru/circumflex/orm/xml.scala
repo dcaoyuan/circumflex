@@ -4,15 +4,19 @@ import java.io.File
 import xml._
 import ORM._
 
-// ## XML (de)serialization
+/*!# XML (de)serialization
 
-/**
- * A trait for data holders that are capable of (de)serializing themselves (from)into
- * XML. 
+ Circumflex ORM allows you to load graphs of associated records from XML files.
+ This is very useful for loading test data and exchanging records between databases
+ with associations preserving (in id-independent style).
+
+ Every `Field` capable of (de)serializing itself (from)into XML should extend the
+ `XmlSerializable` trait. A record can be read from XML format if it contains only
+ `XmlSerializable` fields.
  */
 trait XmlSerializable[T] {
-  def to(value: T): String
-  def from(string: String): T
+  def fromXml(str: String): T
+  def toXml(value: T): String
 }
 
 /**
@@ -34,9 +38,9 @@ class Deployment(val id: String,
       throw e
   }
 
-  protected def processNode[R <: AnyRef](
+  protected def processNode[R](
     node: Node,
-    parentPath: Seq[Pair[Association[_, _], AnyRef]]): R = {
+    parentPath: Seq[Pair[Association[_, _], Any]]): R = {
     val cl = pickClass(node)
     var r = cl.newInstance.asInstanceOf[R]
     // Decide, whether a record should be processed, and how exactly.
@@ -61,8 +65,8 @@ class Deployment(val id: String,
     node.attributes.foreach(a => setRecordField(r, a.key, a.value.toString))
     node.child.foreach {
       case n: Elem => try {
-          r.getClass.getMethod(n.label) match {
-            case m if (classOf[Field[_]].isAssignableFrom(m.getReturnType)) =>
+          r.asInstanceOf[AnyRef].getClass.getMethod(n.label) match {
+            case m if (classOf[Field[R, _]].isAssignableFrom(m.getReturnType)) =>
               setRecordField(r, n.label, n.text.trim)
             case m if (classOf[Association[_, _]].isAssignableFrom(m.getReturnType)) =>
               n.child.find(_.isInstanceOf[Elem]) match {
@@ -79,7 +83,7 @@ class Deployment(val id: String,
           }
         } catch {
           case e: NoSuchMethodException =>
-            ormLog.warning("Could not process '" + n.label + "' of " + r.getClass)
+            ormLog.warning("Could not process '" + n.label + "' of " + r.asInstanceOf[AnyRef].getClass)
         }
       case _ =>
     }
@@ -98,31 +102,31 @@ class Deployment(val id: String,
     return Class.forName(p + node.label, true, Thread.currentThread().getContextClassLoader())
   }
 
-  protected def setRecordField[R <: AnyRef](r: R, k: String, v: String): Unit = try {
-    val m = r.getClass.getMethod(k)
-    if (classOf[Field[_]].isAssignableFrom(m.getReturnType)) {    // only scalar fields are accepted
-      val field = m.invoke(r).asInstanceOf[Field[Any]]
+  protected def setRecordField[R](r: R, k: String, v: String): Unit = try {
+    val m = r.asInstanceOf[AnyRef].getClass.getMethod(k)
+    if (classOf[Field[R, _]].isAssignableFrom(m.getReturnType)) {    // only scalar fields are accepted
+      val field = m.invoke(r).asInstanceOf[Field[R, Any]]
       val value = convertValue(r, k, v)
       field.setValue(r, value)
     }
   } catch {
-    case e: NoSuchMethodException => ormLog.warning("Could not process '" + k + "' of " + r.getClass)
+    case e: NoSuchMethodException => ormLog.warning("Could not process '" + k + "' of " + r.asInstanceOf[AnyRef].getClass)
   }
 
-  protected def prepareCriteria[R <: AnyRef](r: R, n: Node): Criteria[R] = {
+  protected def prepareCriteria[R](r: R, n: Node): Criteria[R] = {
     val relation = RelationRegistry.getRelation(r)
     val crit = relation.criteria
     n.attributes.foreach(a => {
         val k = a.key
         val v = convertValue(r, k, a.value.toString)
-        val field = r.getClass.getMethod(k).invoke(r).asInstanceOf[Field[Any]]
+        val field = r.asInstanceOf[AnyRef].getClass.getMethod(k).invoke(r).asInstanceOf[Field[R, Any]]
         crit.add(field EQ v)
       })
     return crit
   }
 
-  protected def convertValue(r: AnyRef, k: String, v: String): Any = try {
-    r.getClass.getMethod(k).invoke(r).asInstanceOf[XmlSerializable[Any]].from(v)
+  protected def convertValue(r: Any, k: String, v: String): Any = try {
+    r.asInstanceOf[AnyRef].getClass.getMethod(k).invoke(r).asInstanceOf[XmlSerializable[Any]].fromXml(v)
   } catch {
     case _ => v
   }

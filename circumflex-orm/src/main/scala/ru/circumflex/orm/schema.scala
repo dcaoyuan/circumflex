@@ -17,8 +17,8 @@ class Schema(val name: String) extends SchemaObject {
 /**
  * Common stuff for all constraints.
  */
-abstract class Constraint(val relation: Relation[_],
-                          val constraintName: String)
+abstract class Constraint[R](val relation: Relation[R],
+                             val constraintName: String)
 extends SchemaObject with SQLable {
 
   val objectName = "CONSTRAINT " + constraintName
@@ -34,36 +34,36 @@ extends SchemaObject with SQLable {
 /**
  * An SQL `UNIQUE` constraint.
  */
-class UniqueKey(relation: Relation[_],
-                name: String,
-                val fields: Seq[Field[_]])
-extends Constraint(relation, name) {
+class UniqueKey[R](relation: Relation[R],
+                   name: String,
+                   val fields: Seq[Field[R, _]]
+) extends Constraint(relation, name) {
   def sqlDefinition = dialect.uniqueKeyDefinition(this)
 }
 
 /**
  * An SQL `FOREIGN KEY` constraint.
  */
-class ForeignKey(relation: Relation[_],
-                 name: String,
-                 val foreignRelation: Relation[_],
-                 val localFields: Seq[Field[_]],
-                 val foreignFields: Seq[Field[_]],
-                 protected var _onDelete: ForeignKeyAction,
-                 protected var _onUpdate: ForeignKeyAction)
-extends Constraint(relation, name) {
+class ForeignKey[R](relation: Relation[R],
+                    name: String,
+                    val foreignRelation: Relation[_],
+                    val localFields: Seq[Field[R, _]],
+                    val foreignFields: Seq[Field[_, _]],
+                    protected var _onDelete: ForeignKeyAction,
+                    protected var _onUpdate: ForeignKeyAction
+) extends Constraint(relation, name) {
 
   def onDelete = _onDelete
   def onDelete(action: ForeignKeyAction): this.type = {
     _onDelete = action
-    return this
+    this
   }
   def ON_DELETE(action: ForeignKeyAction): this.type = onDelete(action)
 
   def onUpdate = _onUpdate
   def onUpdate(action: ForeignKeyAction): this.type = {
     _onUpdate = action
-    return this
+    this
   }
   def ON_UPDATE(action: ForeignKeyAction): this.type = onUpdate(action)
 
@@ -73,90 +73,17 @@ extends Constraint(relation, name) {
 /**
  * An SQL `FOREIGN KEY` constraint.
  */
-class CheckConstraint(relation: Relation[_],
-                      name: String,
-                      val expression: String)
-extends Constraint(relation, name) {
+class CheckConstraint[R](relation: Relation[R], name: String, val expression: String) extends Constraint(relation, name) {
   def sqlDefinition = dialect.checkConstraintDefinition(this)
 }
 
-/**
- * A helper to create SQL constraints for the relation.
- */
-class ConstraintHelper(relation: Relation[_], name: String) {
-  def unique(fields: Field[_]*): UniqueKey = {
-    val uniq = new UniqueKey(relation, name, fields.toList)
-    relation._constraints ++= List(uniq)
-    return uniq
-  }
-  def UNIQUE(fields: Field[_]*) = unique(fields: _*)
-
-  def check(expression: String): CheckConstraint = {
-    val chk = new CheckConstraint(relation, name, expression)
-    relation._constraints ++= List(chk)
-    return chk
-  }
-  def CHECK(expression: String) = check(expression: String)
-
-  def foreignKey(foreignRelation: Relation[_],
-                 localFields: Seq[Field[_]],
-                 foreignFields: Seq[Field[_]]): ForeignKey = {
-    val fk = new ForeignKey(relation, name, foreignRelation, localFields, foreignFields,
-                            NO_ACTION, NO_ACTION)
-    relation._constraints ++= List(fk)
-    return fk
-  }
-  def FOREIGN_KEY(foreignRelation: Relation[_],
-                  localFields: Seq[Field[_]],
-                  foreignFields: Seq[Field[_]]
-  ): ForeignKey =
-    foreignKey(foreignRelation, localFields, foreignFields)
-
-  def foreignKey(foreignRelation: Relation[_],
-                 fields: Pair[Field[_], Field[_]]*): ForeignKey = {
-    val localFileds = fields.map(_._1)
-    val foreignFields = fields.map(_._2)
-    foreignKey(foreignRelation, localFileds, foreignFields)
-  }
-  def FOREIGN_KEY(foreignRelation: Relation[_], fields: Pair[Field[_], Field[_]]*): ForeignKey =
-    foreignKey(foreignRelation, fields: _*)
-
-  def foreignKey(localFields: Field[_]*): ForeignKeyHelper =
-    new ForeignKeyHelper(relation, name, localFields)
-  def FOREIGN_KEY(localFields: Field[_]*): ForeignKeyHelper =
-    foreignKey(localFields: _*)
-}
-
-/**
- * A special helper for creating foreign keys in DSL style.
- */
-class ForeignKeyHelper(relation: Relation[_], name: String, localFields: Seq[Field[_]]) {
-  def references(foreignRelation: Relation[_],
-                 foreignFields: Field[_]*): ForeignKey = {
-    val fk = new ForeignKey(relation, name, foreignRelation, localFields, foreignFields,
-                            NO_ACTION, NO_ACTION)
-    relation._constraints ++= List(fk)
-    return fk
-  }
-  def REFERENCES(foreignRelation: Relation[_], foreignFields: Field[_]*): ForeignKey =
-    references(foreignRelation, foreignFields: _*)
-}
-
-// ### Indexes
-
-/**
- * Index definition for the relation.
- */
-class Index(val relation: Relation[_],
-            val name: String,
-            expressions: String*)
-extends SchemaObject {
+class Index[R](val relation: Relation[R], val name: String, expressions: String*) extends SchemaObject {
 
   def expression = expressions.mkString(", ")
 
   /**
    * DSL for defining `UNIQUE` indexes.
-   */  
+   */
   protected var _unique: Boolean = false
   def unique_?() = _unique
   def unique: this.type = {
@@ -191,3 +118,62 @@ extends SchemaObject {
   val sqlCreate = dialect.createIndex(this)
   val sqlDrop = dialect.dropIndex(this)
 }
+
+class Sequence(val name: String) extends SchemaObject {
+  val objectName = "SEQUENCE " + name
+  val sqlCreate = dialect.createSequence(this)
+  val sqlDrop = dialect.dropSequence(this)
+}
+
+/**
+ * A helper to create SQL constraints for the relation.
+ */
+class ConstraintHelper[R](relation: Relation[R], name: String) {
+  def UNIQUE(fields: Field[R, _]*): UniqueKey[R] = new UniqueKey[R](relation, name, fields.toList)
+
+  def CHECK(expression: String): CheckConstraint[R] = new CheckConstraint[R](relation, name, expression)
+
+  def FOREIGN_KEY(foreignRelation: Relation[R], localFields: Seq[Field[R, _]], foreignFields: Seq[Field[R, _]]): ForeignKey[R] =
+    new ForeignKey[R](relation, name, foreignRelation, localFields, foreignFields, NO_ACTION, NO_ACTION)
+
+  def FOREIGN_KEY(foreignRelation: Relation[R], fields: Pair[Field[R, _], Field[R, _]]*): ForeignKey[R] = {
+    val localFileds = fields.map(_._1)
+    val foreignFields = fields.map(_._2)
+    FOREIGN_KEY(foreignRelation, localFileds, foreignFields)
+  }
+
+  def FOREIGN_KEY(localFields: Field[R, _]*): ForeignKeyHelper[R] = new ForeignKeyHelper[R](relation, name, localFields)
+}
+
+/**
+ * A special helper for creating foreign keys in DSL style.
+ */
+class ForeignKeyHelper[R](relation: Relation[R], name: String, localFields: Seq[Field[R, _]]) {
+  def REFERENCES(foreignRelation: Relation[_], foreignFields: Field[_, _]*): ForeignKey[R] =
+    new ForeignKey(relation, name, foreignRelation, localFields, foreignFields, NO_ACTION, NO_ACTION)
+}
+
+class DefinitionHelper[R](relation: Relation[R], name: String) {
+  def TINYINT() = new TinyintField[R](relation, name)
+  def INTEGER() = new IntField[R](relation, name)
+  def BIGINT() = new LongField[R](relation, name)
+  def FLOAT(precision: Int = -1, scale: Int = 1) = new FloatField[R](relation, name, precision, scale)
+  def DOUBLE(precision: Int = -1, scale: Int = 1) = new DoubleField[R](relation, name, precision, scale)
+  def NUMERIC(precision: Int = -1, scale: Int = 1) = new NumericField[R](relation, name, precision, scale)
+  def TEXT() = new TextField[R](relation, name, dialect.textType)
+  def VARCHAR(length: Int = -1) = new TextField[R](relation, name, length)
+  def VARBINARY(length: Int = -1) = new VarbinaryField[R](relation, name, length)
+  def SERIALIZED[T](tpe: Class[T], length: Int = -1) = new SerializedField[R, T](relation, name, tpe, length)
+  def BOOLEAN() = new BooleanField[R](relation, name)
+  def DATE() = new DateField[R](relation, name)
+  def TIME() = new TimeField[R](relation, name)
+  def TIMESTAMP() = new TimestampField[R](relation, name)
+  def XML() = new XmlField[R](relation, name)
+
+  def INDEX(expression: String) = new Index[R](relation, name, expression)
+
+  //def REFERENCES[F](toRelation: Relation[F]): Association[R, F] = new Association[R, F](relation, name, toRelation)
+}
+
+// ### Indexes
+

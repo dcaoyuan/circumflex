@@ -25,12 +25,12 @@ object Model {
   object Countries extends Table[Country] {
     val code = "code" VARCHAR(2) DEFAULT("'ch'")
     val name = "name" TEXT
-    val capital = "capital_id" REFERENCES(Capitals)
+    val capital = "capital_id".BIGINT REFERENCES(Capitals)
 
     // Inverse associations, should be def or lazy val
     def cities = inverse(Cities.country)
 
-    INDEX("country_code_idx", "LOWER(code)") USING "btree" UNIQUE
+    val codeIdx = "country_code_idx" INDEX("LOWER(code)") USING "btree" UNIQUE
 
     // Validations
 //  validation.notEmpty(code)
@@ -55,7 +55,7 @@ object Model {
     // Fields
     val name = "name" TEXT
     // Associations
-    val country = "country_id" REFERENCES(Countries) ON_DELETE CASCADE ON_UPDATE CASCADE
+    val country = "country_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE ON_UPDATE CASCADE
     val serialized = "serialized" SERIALIZED(classOf[Array[Double]], 100)
 
     // Validations
@@ -73,15 +73,16 @@ object Model {
     // Associations
     var country: Country = _
     var city: City = _
+    
     override def toString = "Capital(country=" + country.name + ", name=" + city.name + ")"
   }
 
   object Capitals extends Table[Capital] {
     // Associations
-    val country = "countries_id" REFERENCES(Countries) ON_DELETE CASCADE
-    val city = "cities_id" REFERENCES(Cities) ON_DELETE RESTRICT
-    UNIQUE (country)
-    UNIQUE (city)
+    val country = "countries_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE
+    val city = "cities_id".BIGINT REFERENCES(Cities) ON_DELETE RESTRICT
+    val countryKey = UNIQUE(country)
+    val cityKey = UNIQUE(city)
   }
 
 

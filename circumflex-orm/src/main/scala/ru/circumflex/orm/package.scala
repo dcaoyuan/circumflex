@@ -10,9 +10,9 @@ package object orm {
 
   // ### Implicits
 
-  implicit def relation2node[R <: AnyRef](relation: Relation[R]): RelationNode[R] =
+  implicit def relation2node[R](relation: Relation[R]): RelationNode[R] =
     relation.as(relation.relationName)
-  implicit def node2Relation[R <: AnyRef](node: RelationNode[R]): Relation[R] = {
+  implicit def node2Relation[R](node: RelationNode[R]): Relation[R] = {
     lastAlias(node.alias) // is this necessary ?
     node.relation
   }
@@ -29,14 +29,14 @@ package object orm {
   implicit def predicate2string(predicate: Predicate): String = predicate.toInlineSql
   implicit def string2projection(expression: String): Projection[Any] =
     new ExpressionProjection[Any](expression)
-  implicit def association2field(association: Association[_, _]): Field[Long] =
+  implicit def association2field[R](association: Association[R, _]): Field[R, Long] =
     association.field
-  /* implicit def relation2recordSample[R <: AnyRef](relation: Relation[R]): R =
+  /* implicit def relation2recordSample[R](relation: Relation[R]): R =
    relation.r */
-  implicit def field2projection[T](field: Field[T]): Projection[T] =
+  implicit def field2projection[T](field: Field[_, T]): Projection[T] =
     new ExpressionProjection[T](field2str(field))
   // The most magical ones.
-  /* implicit def node2record[R <: AnyRef](node: RelationNode[R]): R = {
+  /* implicit def node2record[R](node: RelationNode[R]): R = {
    lastAlias(node.alias)
    return node.relation.r
    } */
@@ -44,10 +44,10 @@ package object orm {
    case Some(alias) => alias + "." + field.name
    case None => field.name
    } */
-  implicit def field2str(field: Field[_]): String =
+  implicit def field2str(field: Field[_, _]): String =
     field.relation.relationName + "." + field.name
-  implicit def field2helper(field: Field[_]) = new SimpleExpressionHelper(field2str(field))
-  implicit def field2order(field: Field[_]): Order = new Order(field2str(field), Nil)
+  implicit def field2helper(field: Field[_, _]) = new SimpleExpressionHelper(field2str(field))
+  implicit def field2order(field: Field[_, _]): Order = new Order(field2str(field), Nil)
 
   implicit def tuple2proj[T1, T2](
     t: Tuple2[Projection[T1],Projection[T2]]) =
@@ -188,11 +188,11 @@ package object orm {
 
   def select[T](projection: Projection[T]) = new Select(projection)
   def SELECT[T](projection: Projection[T]) = select(projection)
-  def insertInto[R <: AnyRef](relation: Relation[R]) = new InsertSelectHelper(relation)
-  def INSERT_INTO[R <: AnyRef](relation: Relation[R]) = insertInto(relation)
-  def update[R <: AnyRef](node: RelationNode[R]) = new Update(node)
-  def UPDATE[R <: AnyRef](node: RelationNode[R]) = update(node)
-  def delete[R <: AnyRef](node: RelationNode[R]) = new Delete(node)
-  def DELETE[R <: AnyRef](node: RelationNode[R]) = delete(node)
+  def insertInto[R](relation: Relation[R]) = new InsertSelectHelper(relation)
+  def INSERT_INTO[R](relation: Relation[R]) = insertInto(relation)
+  def update[R](node: RelationNode[R]) = new Update(node)
+  def UPDATE[R](node: RelationNode[R]) = update(node)
+  def delete[R](node: RelationNode[R]) = new Delete(node)
+  def DELETE[R](node: RelationNode[R]) = delete(node)
 
 }

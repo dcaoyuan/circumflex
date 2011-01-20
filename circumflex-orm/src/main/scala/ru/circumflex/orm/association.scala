@@ -4,12 +4,34 @@ import ORM._
 
 // ## Association
 
-class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
-                                            name: String,
-                                            uuid: String,
-                                            val foreignRelation: Relation[F],
-                                            prefetch_? : Boolean = false
+class Association[R, F](val relation: Relation[R],
+                        val name: String,
+                        val foreignRelation: Relation[F],
+                        prefetch_? : Boolean = false
 ) {
+
+  val uuid = relation.uuid + "." + name
+
+  val field: Field[R, Long] = new InternalField
+
+  /*! Column definition methods delegate to underlying field. */
+  def notNull_?(): Boolean = field.notNull_?
+  def NOT_NULL(): this.type = {
+    field.NOT_NULL
+    this
+  }
+  def unique_?(): Boolean = field.unique_?
+  def UNIQUE(): this.type = {
+    field.UNIQUE
+    this
+  }
+  def defaultExpression: Option[String] = field.defaultExpression
+  def DEFAULT(expr: String): this.type = {
+    field.DEFAULT(expr)
+    this
+  }
+
+
 
   protected var _initialized: Boolean = false
 
@@ -17,10 +39,6 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
 
   protected var _onDelete: ForeignKeyAction = NO_ACTION
   protected var _onUpdate: ForeignKeyAction = NO_ACTION
-
-  val field = new InternalField
-
-  relation.addAssociation(this)
 
   // ### Commons
 
@@ -58,19 +76,19 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
 
   def onDelete(action: ForeignKeyAction): this.type = {
     _onDelete = action
-    return this
+    this
   }
   def ON_DELETE(action: ForeignKeyAction): this.type = onDelete(action)
 
   def onUpdate(action: ForeignKeyAction): this.type = {
     _onUpdate = action
-    return this
+    this
   }
   def ON_UPDATE(action: ForeignKeyAction): this.type = onUpdate(action)
 
-  class InternalField extends Field[Long](relation, name, uuid, dialect.longType) {
+  class InternalField extends Field[R, Long](relation, name, dialect.longType) {
 
-    override def getValue(from: AnyRef): Long = {
+    override def getValue(from: R): Long = {
       try {
         recField match {
           case Some(x) =>
@@ -83,7 +101,7 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
       } catch {case e: Exception => throw new RuntimeException(e)}
     }
 
-    override def setValue(to: AnyRef, id: Long): Option[() => Unit] = {
+    override def setValue(to: R, id: Long): Option[() => Unit] = {
       if (id == -1) return None
       
       // return a lazy fetcher so the foreign record may has been ready after all query's read(rs) done
@@ -99,10 +117,11 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
     }
 
     // set instance to's reference field to foreign record
-    def _setValue(to: AnyRef, fRecord: F) {
+    def _setValue(to: R, fRecord: F) {
       try {
         recField match {
-          case Some(x) => x.setter.invoke(to, fRecord)
+          case Some(x) =>
+            x.setter.invoke(to, fRecord.asInstanceOf[AnyRef])
           case None =>
         }
       } catch {case e: Exception => throw new RuntimeException(e)}
@@ -114,12 +133,10 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
     else {
       val id = relation.idOf(record)
       val root = foreignRelation
-      (SELECT (root.*) FROM (relation JOIN root) WHERE (field EQ id)).unique match {
-        case Some(fRecord) =>
-          //tx.updateRecordCache(foreignRelation, fRecord)
-          field._setValue(record, fRecord)
-          Some(fRecord)
-        case None => None
+      (SELECT (root.*) FROM (relation JOIN root) WHERE (field EQ id)).unique map {fRecord =>
+        //tx.updateRecordCache(foreignRelation, fRecord)
+        field.asInstanceOf[InternalField]._setValue(record, fRecord)
+        fRecord
       }
     }
   }
@@ -127,7 +144,7 @@ class Association[R <: AnyRef, F <: AnyRef](val relation: Relation[R],
 
 // ## Inverse Associations
 
-class InverseAssociation[P <: AnyRef, C <: AnyRef](val association: Association[C, P]) {
+class InverseAssociation[P, C](val association: Association[C, P]) {
   
   def apply(record: P): Seq[C] = {
     if (association.foreignRelation.transient_?(record)) Nil
