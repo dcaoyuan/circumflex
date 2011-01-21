@@ -19,16 +19,16 @@ class DDLUnit {
   protected var _views: Seq[View[_]] = Nil
   protected var _constraints: Seq[Constraint[_]] = Nil
   protected var _indexes: Seq[Index[_]] = Nil
-  protected var _preAuxs: Seq[SchemaObject] = Nil
-  protected var _postAuxs: Seq[SchemaObject] = Nil
+  protected var _preAuxes: Seq[SchemaObject] = Nil
+  protected var _postAuxes: Seq[SchemaObject] = Nil
 
   def schemata = _schemata
   def tables = _tables
   def views = _views
   def constraints = _constraints
   def indexes = _indexes
-  def preAuxs = _preAuxs
-  def postAuxs = _postAuxs
+  def preAuxes = _preAuxes
+  def postAuxes = _postAuxes
 
   protected var _msgs: Seq[Msg] = Nil
   def messages = _msgs
@@ -49,8 +49,8 @@ class DDLUnit {
     _tables = Nil
     _views = Nil
     _constraints = Nil
-    _preAuxs = Nil
-    _postAuxs = Nil
+    _preAuxes = Nil
+    _postAuxes = Nil
     resetMsgs()
   }
 
@@ -62,7 +62,7 @@ class DDLUnit {
   def addObject(obj: SchemaObject): this.type = {
     def processRelation(r: Relation[_]) {
       addObject(r.schema)
-      _preAuxs ++= (r.preAux filter (!_preAuxs.contains(_)))
+      _preAuxes ++= (r.preAux filter (!_preAuxes.contains(_)))
       r.postAux foreach addObject
     }
 
@@ -86,8 +86,8 @@ class DDLUnit {
         if (!_schemata.contains(s))
           _schemata :+= s
       case o =>
-        if (!_postAuxs.contains(o))
-          _postAuxs :+= o
+        if (!_postAuxes.contains(o))
+          _postAuxes :+= o
     }
     this
   }
@@ -129,11 +129,11 @@ class DDLUnit {
       val autoCommit = conn.getAutoCommit
       conn.setAutoCommit(true)
       // Execute a script.
-      dropObjects(postAuxs, conn)
+      dropObjects(postAuxes, conn)
       dropObjects(views, conn)
       if (dialect.supportsDropConstraints_?) dropObjects(constraints, conn)
       dropObjects(tables, conn)
-      dropObjects(preAuxs, conn)
+      dropObjects(preAuxes, conn)
       if (dialect.supportsSchema_?) dropObjects(schemata, conn)
       // Restore auto-commit.
       conn.setAutoCommit(autoCommit)
@@ -153,11 +153,11 @@ class DDLUnit {
     conn.setAutoCommit(true)
     // Execute a script.
     if (dialect.supportsSchema_?) createObjects(schemata, conn)
-    createObjects(preAuxs, conn)
+    createObjects(preAuxes, conn)
     createObjects(tables, conn)
     createObjects(constraints, conn)
     createObjects(views, conn)
-    createObjects(postAuxs, conn)
+    createObjects(postAuxes, conn)
     // disable Referential integrity check, @todo, it's better to not add RI constraints?
     setReferentialIntegrity(false, conn)
     // Restore auto-commit.
@@ -190,8 +190,8 @@ class DDLUnit {
                           tables.size +
                           constraints.size +
                           views.size +
-                          preAuxs.size +
-                          postAuxs.size)
+                          preAuxes.size +
+                          postAuxes.size)
       result += objectsCount + " objects in queue."
     } else {
       val errorsCount = messages.filter(m => m.isInstanceOf[DDLUnit.ErrorMsg]).size

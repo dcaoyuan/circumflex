@@ -62,7 +62,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   private val recordSample: R = recordClass.newInstance
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
 
-  private var recordToId = WeakIdentityBiHashMap[R, Long]()
+  private var recordToPk = WeakIdentityBiHashMap[R, Long]()
 
 
   protected var _fieldToRecField: Map[Field[R, _], ClassVariable[R, _]] = Map()
@@ -70,8 +70,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   protected var _associations: Seq[Association[R, _]] = Nil
   protected var _constraints: Seq[Constraint[R]] = Nil
   protected var _indexes: Seq[Index[R]] = Nil
-  protected var _preAux: Seq[SchemaObject] = Nil
-  protected var _postAux: Seq[SchemaObject] = Nil
+  protected var _preAuxes: Seq[SchemaObject] = Nil
+  protected var _postAuxes: Seq[SchemaObject] = Nil
 
   /**
    * Unique identifier based on `recordClass` to identify this relation
@@ -139,8 +139,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     _indexes
   }
 
-  def preAux: Seq[SchemaObject] = _preAux
-  def postAux: Seq[SchemaObject] = _postAux
+  def preAux: Seq[SchemaObject] = _preAuxes
+  def postAux: Seq[SchemaObject] = _postAuxes
 
   def r: R = recordSample
   def > = r
@@ -151,63 +151,63 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   def readOnly_? : Boolean = false
 
   def idOf(record: R): Option[Long] = {
-    recordToId.readLock.lock
+    recordToPk.readLock.lock
     try {
-      recordToId.get(record)
+      recordToPk.get(record)
     } finally {
-      recordToId.readLock.unlock
+      recordToPk.readLock.unlock
     }
   }
   def recordOf(id: Long): Option[R] = {
-    recordToId.readLock.lock
+    recordToPk.readLock.lock
     try {
-      recordToId.getByValue(id) match {
+      recordToPk.getByValue(id) match {
         case None | Some(null) => None
         case some => some
       }
     } finally {
-      recordToId.readLock.unlock
+      recordToPk.readLock.unlock
     }
   }
   def updateCache(id: Long, record: R) {
-    recordToId.writeLock.lock
+    recordToPk.writeLock.lock
     try {
-      recordToId.put(record, id)
+      recordToPk.put(record, id)
     } finally {
-      recordToId.writeLock.unlock
+      recordToPk.writeLock.unlock
     }
   }
   def evictCache(record: R) {
-    recordToId.writeLock.lock
+    recordToPk.writeLock.lock
     try {
-      recordToId.remove(record)
+      recordToPk.remove(record)
     } finally {
-      recordToId.writeLock.unlock
+      recordToPk.writeLock.unlock
     }
   }
   def evictCaches(records: Array[R]) {
-    recordToId.writeLock.lock
+    recordToPk.writeLock.lock
     try {
       var i = 0
       while (i < records.length) {
-        recordToId.remove(records(i))
+        recordToPk.remove(records(i))
         i += 1
       }
     } finally {
-      recordToId.writeLock.unlock
+      recordToPk.writeLock.unlock
     }
   }
-  def invalideCaches {recordToId = WeakIdentityBiHashMap[R, Long]()}
+  def invalideCaches {recordToPk = WeakIdentityBiHashMap[R, Long]()}
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
    */
   def transient_?(record: R): Boolean = {
-    recordToId.readLock.lock
+    recordToPk.readLock.lock
     try {
-      !recordToId.contains(record)
+      !recordToPk.contains(record)
     } finally {
-      recordToId.readLock.unlock
+      recordToPk.readLock.unlock
     }
   }
 
@@ -232,7 +232,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
 
 
   private def findMembers(cl: Class[_]) {
-    ClassUtil.getValDefs(getClass) foreach processMember
+    ClassUtil.getValDefs(cl) foreach processMember
   }
 
   private def processMember(getter: Method) {
@@ -245,7 +245,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     } else if (classOf[Association[R, _]].isAssignableFrom(cl)) {
       val assoc = getter.invoke(this).asInstanceOf[Association[R, _]]
       this._associations :+= assoc
-      this._constraints  :+= associationFK(assoc)
+      this._constraints :+= associationFK(assoc)
       this._fields :+= assoc.field
       if (assoc.unique_?) UNIQUE(assoc.field)
       recordFields find (_.name == getter.getName) foreach {recField => this._fieldToRecField += (assoc.field -> recField)}
@@ -326,7 +326,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    * Add specified `objects` to this relation's `preAux` queue.
    */
   def addPreAux(objects: SchemaObject*): this.type = {
-    _preAux ++= (objects filter (!_preAux.contains(_)))
+    _preAuxes ++= (objects filter (!_preAuxes.contains(_)))
     this
   }
 
@@ -334,7 +334,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    * Add specified `objects` to this relaion's `postAux` queue.
    */
   def addPostAux(objects: SchemaObject*): this.type = {
-    _postAux ++= (objects filter (!_postAux.contains(_)))
+    _postAuxes ++= (objects filter (!_postAuxes.contains(_)))
     this
   }
 
