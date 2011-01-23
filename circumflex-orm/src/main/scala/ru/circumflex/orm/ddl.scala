@@ -62,8 +62,8 @@ class DDLUnit {
   def addObject(obj: SchemaObject): this.type = {
     def processRelation(r: Relation[_]) {
       addObject(r.schema)
-      _preAuxes ++= (r.preAux filter (!_preAuxes.contains(_)))
-      r.postAux foreach addObject
+      _preAuxes ++= (r.preAuxes filter (!_preAuxes.contains(_)))
+      r.postAuxes foreach addObject
     }
 
     obj match {
@@ -167,11 +167,11 @@ class DDLUnit {
 
   def setReferentialIntegrity(enable: Boolean, conn: Connection) {
     val sql = dialect.setReferentialIntegrity(enable)
-    autoClose(conn.prepareStatement(sql)){st =>
+    autoClose(conn.prepareStatement(sql)) {st =>
       st.executeUpdate
-      _msgs ++= List(InfoMsg("OK: ", sql))
+      _msgs :+= InfoMsg("OK: ", sql)
     }(e =>
-      _msgs ++= List(ErrorMsg(e.getMessage, sql)))
+      _msgs :+= ErrorMsg(e.getMessage, sql))
   }
   
   /**

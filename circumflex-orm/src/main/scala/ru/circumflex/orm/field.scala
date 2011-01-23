@@ -89,7 +89,6 @@ class Field[R, T](val relation: Relation[R],
     }
   }
 
-
   override def toString = name
 }
 
@@ -155,6 +154,35 @@ class VarbinaryField[R](relation: Relation[R], name: String, sqlType: String
   def fromXml(string: String) = string.getBytes
 }
 
+class BooleanField[R](relation: Relation[R], name: String
+) extends XmlSerializableField[R, Boolean](relation, name, dialect.booleanType) {
+  def fromXml(string: String) = string.toBoolean
+}
+
+class TimestampField[R](relation: Relation[R], name: String
+) extends XmlSerializableField[R, Date](relation, name, dialect.timestampType) {
+  def fromXml(string: String) = new Date(java.sql.Timestamp.valueOf(string).getTime)
+  override def toXml(value: Date) = new java.sql.Timestamp(value.getTime).toString
+}
+
+class DateField[R](relation: Relation[R], name: String
+) extends XmlSerializableField[R, Date](relation, name, dialect.dateType) {
+  def fromXml(string: String) = new Date(java.sql.Date.valueOf(string).getTime)
+  override def toXml(value: Date) = new java.sql.Date(value.getTime).toString
+}
+
+class TimeField[R](relation: Relation[R], name: String
+) extends XmlSerializableField[R, Date](relation, name, dialect.timeType) {
+  def fromXml(string: String) = new Date(java.sql.Time.valueOf(string).getTime)
+  override def toXml(value: Date) = new java.sql.Time(value.getTime).toString
+}
+
+class XmlField[R](relation: Relation[R], name: String
+) extends XmlSerializableField[R, NodeSeq](relation, name, dialect.xmlType) {
+  def fromXml(str: String): NodeSeq = try XML.loadString(str) catch {case _ => null}
+  override def read(rs: ResultSet, alias: String) = Option(fromXml(rs.getString(alias)))
+}
+
 class SerializedField[R, T](relation: Relation[R], name: String, tpe: Class[T], length: Int = -1
 ) extends Field[R, Array[Byte]](relation, name, dialect.varbinaryType(length)) {
 
@@ -209,32 +237,5 @@ class SerializedField[R, T](relation: Relation[R], name: String, tpe: Class[T], 
 
 }
 
-class BooleanField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Boolean](relation, name, dialect.booleanType) {
-  def fromXml(string: String) = string.toBoolean
-}
 
-class TimestampField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.timestampType) {
-  def fromXml(string: String) = new Date(java.sql.Timestamp.valueOf(string).getTime)
-  override def toXml(value: Date) = new java.sql.Timestamp(value.getTime).toString
-}
-
-class DateField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.dateType) {
-  def fromXml(string: String) = new Date(java.sql.Date.valueOf(string).getTime)
-  override def toXml(value: Date) = new java.sql.Date(value.getTime).toString
-}
-
-class TimeField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.timeType) {
-  def fromXml(string: String) = new Date(java.sql.Time.valueOf(string).getTime)
-  override def toXml(value: Date) = new java.sql.Time(value.getTime).toString
-}
-
-class XmlField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, NodeSeq](relation, name, dialect.xmlType) {
-  def fromXml(str: String): NodeSeq = try XML.loadString(str) catch {case _ => null}
-  override def read(rs: ResultSet, alias: String) = Option(fromXml(rs.getString(alias)))
-}
 

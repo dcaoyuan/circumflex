@@ -139,8 +139,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     _indexes
   }
 
-  def preAux: Seq[SchemaObject] = _preAuxes
-  def postAux: Seq[SchemaObject] = _postAuxes
+  def preAuxes: Seq[SchemaObject] = _preAuxes
+  def postAuxes: Seq[SchemaObject] = _postAuxes
 
   def r: R = recordSample
   def > = r
