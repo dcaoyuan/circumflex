@@ -6,8 +6,10 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
+import java.nio.ByteBuffer
 import java.sql.ResultSet
 import java.util.Date
+import org.apache.avro.{Schema => AvroSchema}
 import scala.xml.NodeSeq
 import scala.xml.XML
 
@@ -18,7 +20,8 @@ import scala.xml.XML
  */
 class Field[R, T](val relation: Relation[R],
                   val name: String,
-                  val sqlType: String
+                  val sqlType: String,
+                  val avroType: AvroSchema.Type
 ) extends SQLable {
 
   val uuid = relation.uuid + "." + name
@@ -65,27 +68,42 @@ class Field[R, T](val relation: Relation[R],
   def null_?(record: R): Boolean = empty_?(record)
 
   def getValue(from: R): T = {
-    try {
-      recField match {
-        case Some(x) => x.getter.invoke(from).asInstanceOf[T]
-        case None => null.asInstanceOf[T]
-      }
-    } catch {
-      case e: Exception => throw new RuntimeException(e)
+    _getValue(from).asInstanceOf[T]
+  }
+  
+  def setValue(to: R, value: Any): Option[() => Unit] = {
+    _setValue(to, value)
+    None
+  }
+
+
+  /**
+   * @Note usually override getValue/setValue instead of this method
+   * Plain _getValue/_setValue is just used to get/set field value via reflect,
+   * It's value is dealing with the true type of field of the record Object, which
+   * may not be the same type of table field.
+   */
+  protected[orm] def _getValue(from: R): Any = {
+    recField match {
+      case Some(x) =>
+        try {
+          x.getter.invoke(from)
+        } catch {
+          case e: Exception => throw new RuntimeException(e)
+        }
+      case None => null
     }
   }
 
-  def setValue(to: R, value: T): Option[() => Unit] = {
-    try {
-      recField match {
-        case Some(x) =>
-          //val o1 = Utils.convert(v, classField.getType)
-          x.setter.invoke(to, value.asInstanceOf[AnyRef]) // @todo, T is any
-          None
-        case None => None
-      }
-    } catch {
-      case e: Exception => throw new RuntimeException(e)
+  protected[orm] def _setValue(to: R, value: Any) {
+    recField match {
+      case Some(x) =>
+        try {
+          x.setter.invoke(to, value.asInstanceOf[AnyRef])
+        } catch {
+          case e: Exception => throw new RuntimeException(e)
+        }
+      case None =>
     }
   }
 
@@ -107,113 +125,107 @@ class AutoPrimaryKeyField[R](relation: Relation[R]
   override def defaultExpression = Some(dialect.defaultExpression(this))
 }
 
-abstract class XmlSerializableField[R, T](relation: Relation[R], name: String, sqlType: String
-) extends Field[R, T](relation, name, sqlType) with XmlSerializable[T] {
+abstract class XmlSerializableField[R, T](relation: Relation[R], name: String, sqlType: String, avroType: AvroSchema.Type
+) extends Field[R, T](relation, name, sqlType, avroType) with XmlSerializable[T] {
   def toXml(value: T) = value.toString
 }
 
 class TinyintField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Byte](relation, name, dialect.tinyintType) {
+) extends XmlSerializableField[R, Byte](relation, name, dialect.tinyintType, AvroSchema.Type.INT) {
   def fromXml(string: String) = string.toByte
 }
 
 class IntField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Int](relation, name, dialect.integerType) with AutoIncrementable[R, Int] {
+) extends XmlSerializableField[R, Int](relation, name, dialect.integerType, AvroSchema.Type.INT) with AutoIncrementable[R, Int] {
   def fromXml(string: String) = string.toInt
 }
 
 class LongField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Long](relation, name, dialect.longType) with AutoIncrementable[R, Long] {
+) extends XmlSerializableField[R, Long](relation, name, dialect.longType, AvroSchema.Type.LONG) with AutoIncrementable[R, Long] {
   def fromXml(string: String) = string.toLong
 }
 
 class FloatField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
-) extends XmlSerializableField[R, Float](relation, name, dialect.floatType(precision, scale)) {
+) extends XmlSerializableField[R, Float](relation, name, dialect.floatType(precision, scale), AvroSchema.Type.FLOAT) {
   def fromXml(string: String) = string.toFloat
 }
 
 class DoubleField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
-) extends XmlSerializableField[R, Double](relation, name, dialect.doubleType(precision, scale)) {
+) extends XmlSerializableField[R, Double](relation, name, dialect.doubleType(precision, scale), AvroSchema.Type.DOUBLE) {
   def fromXml(string: String) = string.toDouble
 }
 
 class NumericField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
-) extends XmlSerializableField[R, Double](relation, name, dialect.numericType(precision, scale)) {
+) extends XmlSerializableField[R, Double](relation, name, dialect.numericType(precision, scale), AvroSchema.Type.DOUBLE) {
   def fromXml(string: String) = string.toDouble
 }
 
 class TextField[R](relation: Relation[R], name: String, sqlType: String
-) extends XmlSerializableField[R, String](relation, name, sqlType) {
+) extends XmlSerializableField[R, String](relation, name, sqlType, AvroSchema.Type.STRING) {
   def this(relation: Relation[R], name: String, length: Int = -1) = this(relation, name, dialect.varcharType(length))
   def fromXml(string: String) = string
 }
 
 class VarbinaryField[R](relation: Relation[R], name: String, sqlType: String
-) extends XmlSerializableField[R, Array[Byte]](relation, name, sqlType) {
+) extends XmlSerializableField[R, Array[Byte]](relation, name, sqlType, AvroSchema.Type.BYTES) {
   def this(relation: Relation[R], name: String, length: Int = -1) = this(relation, name, dialect.varbinaryType(length))
   def fromXml(string: String) = string.getBytes
 }
 
 class BooleanField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Boolean](relation, name, dialect.booleanType) {
+) extends XmlSerializableField[R, Boolean](relation, name, dialect.booleanType, AvroSchema.Type.BOOLEAN) {
   def fromXml(string: String) = string.toBoolean
 }
 
 class TimestampField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.timestampType) {
+) extends XmlSerializableField[R, Date](relation, name, dialect.timestampType, AvroSchema.Type.LONG) {
   def fromXml(string: String) = new Date(java.sql.Timestamp.valueOf(string).getTime)
   override def toXml(value: Date) = new java.sql.Timestamp(value.getTime).toString
 }
 
 class DateField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.dateType) {
+) extends XmlSerializableField[R, Date](relation, name, dialect.dateType, AvroSchema.Type.LONG) {
   def fromXml(string: String) = new Date(java.sql.Date.valueOf(string).getTime)
   override def toXml(value: Date) = new java.sql.Date(value.getTime).toString
 }
 
 class TimeField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.timeType) {
+) extends XmlSerializableField[R, Date](relation, name, dialect.timeType, AvroSchema.Type.LONG) {
   def fromXml(string: String) = new Date(java.sql.Time.valueOf(string).getTime)
   override def toXml(value: Date) = new java.sql.Time(value.getTime).toString
 }
 
 class XmlField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, NodeSeq](relation, name, dialect.xmlType) {
+) extends XmlSerializableField[R, NodeSeq](relation, name, dialect.xmlType, AvroSchema.Type.STRING) {
   def fromXml(str: String): NodeSeq = try XML.loadString(str) catch {case _ => null}
   override def read(rs: ResultSet, alias: String) = Option(fromXml(rs.getString(alias)))
 }
 
-class SerializedField[R, T](relation: Relation[R], name: String, tpe: Class[T], length: Int = -1
-) extends Field[R, Array[Byte]](relation, name, dialect.varbinaryType(length)) {
+/**
+ * type O is the original type of Object
+ *
+ * @Note:
+ *   when read from rdb,  this field will be setValue by Array[Byte]
+ *   when read from avro, this field will be setValue by ByteBuffer
+ */
+class SerializedField[R, O](relation: Relation[R], name: String, tpe: Class[O], length: Int = -1
+) extends Field[R, Array[Byte]](relation, name, dialect.varbinaryType(length), AvroSchema.Type.BYTES) {
 
   override def getValue(from: R): Array[Byte] = {
-    val v = try {
-      recField match {
-        case Some(x) => x.getter.invoke(from).asInstanceOf[T]
-        case None => null.asInstanceOf[T]
-      }
-    } catch {
-      case e: Exception => throw new RuntimeException(e)
-    }
-    encodeValue(v)
+    val trueValue = _getValue(from).asInstanceOf[O]
+    encodeValue(trueValue)
   }
 
-  override def setValue(to: R, value: Array[Byte]) = {
-    try {
-      recField match {
-        case Some(x) =>
-          val v = decodeValue(value)
-          x.setter.invoke(to, v.asInstanceOf[AnyRef])
-          None
-        case None => None
-      }
-    } catch {
-      case e: Exception => throw new RuntimeException(e)
+  override def setValue(to: R, value: Any) = {
+    val bytes = value match {
+      case x: ByteBuffer => x.array
+      case x: Array[Byte] => x
     }
+    val trueValue = decodeValue(bytes)
+    super.setValue(to, trueValue)
   }
 
-
-  private def encodeValue(v: T): Array[Byte] = {
+  private def encodeValue(v: O): Array[Byte] = {
     val baos = new ByteArrayOutputStream
     val dos = new ObjectOutputStream(baos)
     try {
@@ -225,13 +237,13 @@ class SerializedField[R, T](relation: Relation[R], name: String, tpe: Class[T], 
     baos.toByteArray
   }
 
-  private def decodeValue(bytes: Array[Byte]): T = {
+  private def decodeValue(bytes: Array[Byte]): O = {
     val bais = new ByteArrayInputStream(bytes)
     val dis = new ObjectInputStream(bais)
     try {
-      dis.readObject.asInstanceOf[T]
+      dis.readObject.asInstanceOf[O]
     } catch {
-      case ioe: IOException => null.asInstanceOf[T]
+      case ioe: IOException => null.asInstanceOf[O]
     }
   }
 

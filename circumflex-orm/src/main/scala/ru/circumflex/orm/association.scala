@@ -86,28 +86,30 @@ class Association[R, F](val relation: Relation[R],
   }
   def ON_UPDATE(action: ForeignKeyAction): this.type = onUpdate(action)
 
-  class InternalField extends Field[R, Long](relation, name, dialect.longType) {
+  class InternalField extends Field[R, Long](relation, name, dialect.longType, org.apache.avro.Schema.Type.LONG) {
 
     override def getValue(from: R): Long = {
-      try {
-        recField match {
-          case Some(x) =>
+      recField match {
+        case Some(x) =>
+          try {
             x.getter.invoke(from).asInstanceOf[F] match {
               case null => -1
               case record => foreignRelation.idOf(record).getOrElse(-1)
             }
-          case None => -1
-        }
-      } catch {case e: Exception => throw new RuntimeException(e)}
+          } catch {
+            case e: Exception => throw new RuntimeException(e)
+          }
+        case None => -1
+      }
     }
 
-    override def setValue(to: R, id: Long): Option[() => Unit] = {
+    override def setValue(to: R, id: Any): Option[() => Unit] = {
       if (id == -1) return None
       
       // return a lazy fetcher so the foreign record may has been ready after all query's read(rs) done
       val lazyFetcher = {() =>
-        foreignRelation.recordOf(id) match {
-          case Some(fRecord) => _setValue(to, fRecord)
+        foreignRelation.recordOf(id.asInstanceOf[Long]) match {
+          case Some(fRecord) => _setValue(to, fRecord) // set instance to's reference field to foreign record
           case None =>
         }
         ()
@@ -116,16 +118,6 @@ class Association[R, F](val relation: Relation[R],
       Some(lazyFetcher)
     }
 
-    // set instance to's reference field to foreign record
-    def _setValue(to: R, fRecord: F) {
-      try {
-        recField match {
-          case Some(x) =>
-            x.setter.invoke(to, fRecord.asInstanceOf[AnyRef])
-          case None =>
-        }
-      } catch {case e: Exception => throw new RuntimeException(e)}
-    }
   }
 
   def apply(record: R): Option[F] = {

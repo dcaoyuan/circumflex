@@ -171,8 +171,6 @@ class DefinitionHelper[R](relation: Relation[R], name: String) {
   def XML() = new XmlField[R](relation, name)
 
   def INDEX(expression: String) = new Index[R](relation, name, expression)
-
-  //def REFERENCES[F](toRelation: Relation[F]): Association[R, F] = new Association[R, F](relation, name, toRelation)
 }
 
 // ### Indexes

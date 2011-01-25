@@ -1,98 +1,30 @@
 package ru.circumflex.orm
 
+import java.io.File
 import xml._
 
 
 object Model {
-
-  class Country {
-    // Constructor shortcuts
-    def this(code: String, name: String) = {
-      this()
-      this.code = code
-      this.name = name
-    }
-    // Fields
-    var code: String = _
-    var name: String = _
-    var capital: Capital = _
-    var cities: List[City] = Nil
-    //
-    // Miscellaneous
-    override def toString = "Country(name=" + name + ", code=" + code + ")"
-  }
-
-  object Countries extends Table[Country] {
-    val code = "code" VARCHAR(2) DEFAULT("'ch'")
-    val name = "name" TEXT
-    val capital = "capital_id".BIGINT REFERENCES(Capitals)
-
-    // Inverse associations, should be def or lazy val
-    def cities = inverse(Cities.country)
-
-    val codeIdx = "country_code_idx" INDEX("LOWER(code)") USING "btree" UNIQUE
-
-    // Validations
-//  validation.notEmpty(code)
-//      .notEmpty(name)
-//      .pattern(code, "(?i:[a-z]{2})")
-  }
-
-  class City {
-    // Constructor shortcuts
-    def this(country: Country, name: String) = {
-      this()
-      this.country = country
-      this.name = name
-    }
-    var name: String = _
-    var country: Country = _
-    var serialized: Array[Double] = Array(1, 2, 3)
-    override def toString = "City(name=" + name + " serialized=" + (serialized mkString (",")) + ")"
-  }
-
-  object Cities extends Table[City] {
-    // Fields
-    val name = "name" TEXT
-    // Associations
-    val country = "country_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE ON_UPDATE CASCADE
-    val serialized = "serialized" SERIALIZED(classOf[Array[Double]], 100)
-
-    // Validations
-//  validation.notEmpty(name)
-//      .notNull(country.field)
-  }
-
-  class Capital {
-    // Constructor shortcuts
-    def this(country: Country, city: City) = {
-      this()
-      this.country = country
-      this.city = city
-    }
-    // Associations
-    var country: Country = _
-    var city: City = _
-    
-    override def toString = "Capital(country=" + country.name + ", name=" + city.name + ")"
-  }
-
-  object Capitals extends Table[Capital] {
-    // Associations
-    val country = "countries_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE
-    val city = "cities_id".BIGINT REFERENCES(Cities) ON_DELETE RESTRICT
-    val countryKey = UNIQUE(country)
-    val cityKey = UNIQUE(city)
-  }
+  private val USER_HOME = System.getProperty("user.home")
+  private val DIR = new File(System.getProperty("test.dir", USER_HOME + "/tmp"))
+  private val FILE = new File(DIR, "test.avro")
+  private val syncInterval = 1024 * 100
 
 
   def main(args: Array[String]) {
+    List(Countries, Cities, Capitals) foreach {table => println(table.avroSchema.toString)}
+
     schema
     inserts
     selects
+
+    testAvroWrite
+    testAvroRead
   }
 
-  def schema = new DDLUnit(Cities, Capitals, Countries).dropCreate.messages.foreach(msg => println(msg.body))
+  def schema = {
+    new DDLUnit(Cities, Capitals, Countries).dropCreate.messages.foreach(msg => println(msg.body))
+  }
 
   def inserts = {
     val country = new Country("ru", "russian")
@@ -103,7 +35,7 @@ object Model {
     Cities.save(city)
     Cities.save(new City(country, "abc"))
     Cities.save(new City(country, "def"))
-    
+
     val capital = new Capital(country, city)
     Capitals.save(capital)
     country.capital = capital
@@ -138,5 +70,98 @@ object Model {
     country1.cities ++= Countries.cities(country1)
     country1.cities foreach println
   }
-  
+
+  def testAvroWrite {
+    def writeTable[R](x: Relation[R]) {
+      val records = SELECT (x.*) FROM (x) list()
+      x.writeToAvro(records, new File(DIR, x.relationName + ".avro"))
+    }
+
+    List(Countries, Cities, Capitals) foreach {x => writeTable(x)}
+  }
+
+  def testAvroRead {
+    List(Countries, Cities, Capitals) foreach {x =>
+      x.readFromAvro(new File(DIR, x.relationName + ".avro")) foreach println
+    }
+  }
 }
+
+// ----- Tables
+
+object Countries extends Table[Country] {
+  val code = "code" VARCHAR(2) DEFAULT("'ch'")
+  val name = "name" TEXT
+  val capital = "capital_id".BIGINT REFERENCES(Capitals)
+
+  // Inverse associations, should be def or lazy val
+  def cities = inverse(Cities.country)
+
+  val codeIdx = "country_code_idx" INDEX("code") //USING "btree" UNIQUE
+  //val codeIdx = "country_code_idx" INDEX("LOWER(code)") USING "btree" UNIQUE
+
+  //validation.notEmpty(code).notEmpty(name).pattern(code, "(?i:[a-z]{2})")
+}
+
+class Country {
+  // Constructor shortcuts
+  def this(code: String, name: String) = {
+    this()
+    this.code = code
+    this.name = name
+  }
+  // Fields
+  var code: String = _
+  var name: String = _
+  var capital: Capital = _
+  var cities: List[City] = Nil
+  //
+  // Miscellaneous
+  override def toString = "Country(name=" + name + ", code=" + code + ")"
+}
+
+object Cities extends Table[City] {
+  // Fields
+  val name = "name" TEXT
+  // Associations
+  val country = "country_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE ON_UPDATE CASCADE
+  val serialized = "serialized" SERIALIZED(classOf[Array[Double]], 100)
+
+  //validation.notEmpty(name).notNull(country.field)
+}
+
+class City {
+  // Constructor shortcuts
+  def this(country: Country, name: String) = {
+    this()
+    this.country = country
+    this.name = name
+  }
+  var name: String = _
+  var country: Country = _
+  var serialized: Array[Double] = Array(1, 2, 3)
+  override def toString = "City(name=" + name + " serialized=" + (serialized mkString (",")) + ")"
+}
+
+object Capitals extends Table[Capital] {
+  // Associations
+  val country = "countries_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE
+  val city = "cities_id".BIGINT REFERENCES(Cities) ON_DELETE RESTRICT
+  val countryKey = UNIQUE(country)
+  val cityKey = UNIQUE(city)
+}
+
+class Capital {
+  // Constructor shortcuts
+  def this(country: Country, city: City) = {
+    this()
+    this.country = country
+    this.city = city
+  }
+  // Associations
+  var country: Country = _
+  var city: City = _
+
+  override def toString = "Capital(country=" + Option(country).map(_.name) + ", name=" + Option(city).map(_.name) + ")"
+}
+

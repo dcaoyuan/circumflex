@@ -5,8 +5,15 @@ import JDBC._
 import java.sql.Statement
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
 import org.aiotrade.lib.util.config.Config
+import org.apache.avro.file.DataFileReader
+import org.apache.avro.file.DataFileWriter
+import org.apache.avro.{Schema => AvroSchema}
+import java.io.File
 import java.lang.reflect.Method
 import java.sql.PreparedStatement
+import ru.circumflex.orm.avro.AvroDatumReader
+import ru.circumflex.orm.avro.AvroDatumWriter
+import scala.collection.mutable.ListBuffer
 
 // ## Relations registry
 
@@ -22,18 +29,23 @@ object RelationRegistry {
   def getRelation[R](r: R): Relation[R] =
     classToRelation.get(r.asInstanceOf[AnyRef].getClass) match {
       case Some(rel: Relation[R]) => rel
-      case _ => {
-          val relClass = Config.loadClass[Relation[R]](r.asInstanceOf[AnyRef].getClass.getName + "$")
-          val relation = relClass.getField("MODULE$").get(null).asInstanceOf[Relation[R]]
-          classToRelation += (r.asInstanceOf[AnyRef].getClass -> relation)
-          relation
-        }
+      case _ => 
+        val relClass = Config.loadClass[Relation[R]](r.asInstanceOf[AnyRef].getClass.getName + "$")
+        val relation = relClass.getField("MODULE$").get(null).asInstanceOf[Relation[R]]
+        classToRelation += (r.asInstanceOf[AnyRef].getClass -> relation)
+        relation
     }
-
 }
 
 
 // ## Relation
+object AvroHelper {
+  val THROWABLE_MESSAGE = makeNullable(AvroSchema.create(AvroSchema.Type.STRING))
+
+  def makeNullable(schema: AvroSchema): AvroSchema = {
+    AvroSchema.createUnion(java.util.Arrays.asList(AvroSchema.create(AvroSchema.Type.NULL), schema))
+  }
+}
 
 abstract class Relation[R](implicit m: Manifest[R]) {
 
@@ -63,7 +75,6 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   private val recordFields = ClassUtil.getPublicVariables(recordClass)
 
   private var recordToPk = WeakIdentityBiHashMap[R, Long]()
-
 
   protected var _fieldToRecField: Map[Field[R, _], ClassVariable[R, _]] = Map()
   protected var _fields: Seq[Field[R, _]] = Nil
@@ -624,7 +635,82 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     } catch {case _ => false}
   }
 
-  // ### Equality and others
+  lazy val avroSchema: AvroSchema = createAvroSchema
+
+  protected def createAvroSchema: AvroSchema = {
+    init
+
+    val name = recordClass.getSimpleName
+    val space = if (recordClass.getEnclosingClass != null) { // nested class
+      recordClass.getEnclosingClass.getName + "$"
+    } else {
+      Option(recordClass.getPackage) map (_.getName) getOrElse ""
+    }
+    val error = classOf[Throwable].isAssignableFrom(recordClass)
+
+    val schema = AvroSchema.createRecord(name, null, space, error)
+    val avroFields = new java.util.ArrayList[AvroSchema.Field]()
+    for (field <- fields) {
+      val fieldSchema = createAvroFieldSchema(field)
+      val avroField = new AvroSchema.Field(field.name, fieldSchema, null, null)
+      avroFields.add(avroField)
+    }
+    if (error) { // add Throwable message
+      avroFields.add(new AvroSchema.Field("detailMessage", AvroHelper.THROWABLE_MESSAGE, null, null))
+    }
+    schema.setFields(avroFields)
+
+    schema
+  }
+
+  protected def createAvroFieldSchema(field: Field[R, _]): AvroSchema = {
+    val fieldSchema = AvroSchema.create(field.avroType)
+    if (!field.notNull_?) { // nullable
+      AvroHelper.makeNullable(fieldSchema)
+    } else {
+      fieldSchema
+    }
+  }
+
+  def setFieldValue(record: R, name: String, position: Int, value: Any) {
+    _fieldToRecField.keys find (_.name == name) match {
+      case Some(x) => x.setValue(record, value)
+      case None =>
+    }
+  }
+
+  def getFieldValue(record: R, name: String, position: Int): Any = {
+    _fieldToRecField.keys find (_.name == name) match {
+      case Some(x) => x.getValue(record)
+      case None => null
+    }
+  }
+
+  def writeToAvro(records: Seq[R], file: File) {
+    val writer = new DataFileWriter[R](AvroDatumWriter[R](this))//.setSyncInterval(syncInterval)
+    writer.create(avroSchema, file)
+    try {
+      records foreach writer.append
+    } finally {
+      writer.close
+    }
+  }
+
+  def readFromAvro(file: File): Seq[R] = {
+    val records = ListBuffer[R]()
+
+    val reader = new DataFileReader[R](file, AvroDatumReader[R](this))
+    try {
+      while (reader.hasNext) {
+        val record = reader.next(null.asInstanceOf[R])
+        records += record
+      }
+    } finally {
+      reader.close
+    }
+
+    records.toList
+  }
 
   override def equals(that: Any) = that match {
     case r: Relation[R] => r.relationName.equalsIgnoreCase(this.relationName)

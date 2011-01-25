@@ -29,6 +29,12 @@
             <artifactId>c3p0</artifactId>
             <version>0.9.1.2</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <version>1.4.1</version>
+        </dependency>
     </dependencies>
 
     <profiles>
