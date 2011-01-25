@@ -3,6 +3,7 @@ package ru.circumflex.orm
 import ORM._
 import JDBC._
 import java.sql.Statement
+import org.aiotrade.lib.collection.ArrayList
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
 import org.aiotrade.lib.util.config.Config
 import org.apache.avro.file.DataFileReader
@@ -13,7 +14,6 @@ import java.lang.reflect.Method
 import java.sql.PreparedStatement
 import ru.circumflex.orm.avro.AvroDatumReader
 import ru.circumflex.orm.avro.AvroDatumWriter
-import scala.collection.mutable.ListBuffer
 
 // ## Relations registry
 
@@ -316,10 +316,9 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   /**
    * Fetch all records.
    */
-  def all(limit: Int = -1, offset: Int = 0): Seq[R] = this.criteria
-  .limit(limit)
-  .offset(offset)
-  .list
+  def all(limit: Int = -1, offset: Int = 0): Seq[R] = {
+    this.criteria.limit(limit).offset(offset).list
+  }
 
   // ### Definitions
 
@@ -696,8 +695,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     }
   }
 
-  def readFromAvro(file: File): Seq[R] = {
-    val records = ListBuffer[R]()
+  def readFromAvro(file: File): Array[R] = {
+    val records = ArrayList[R]()
 
     val reader = new DataFileReader[R](file, AvroDatumReader[R](this))
     try {
@@ -709,7 +708,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       reader.close
     }
 
-    records.toList
+    records.toArray
   }
 
   override def equals(that: Any) = that match {

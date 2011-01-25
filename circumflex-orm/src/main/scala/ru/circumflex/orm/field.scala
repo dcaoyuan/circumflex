@@ -218,6 +218,7 @@ class SerializedField[R, O](relation: Relation[R], name: String, tpe: Class[O], 
 
   override def setValue(to: R, value: Any) = {
     val bytes = value match {
+      case null => null
       case x: ByteBuffer => x.array
       case x: Array[Byte] => x
     }
