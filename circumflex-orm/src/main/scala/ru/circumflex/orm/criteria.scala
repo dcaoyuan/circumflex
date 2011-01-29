@@ -84,13 +84,12 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
                                   tree: RelationNode[R]
   ): RelationNode[R] =
     tree match {
-      case j: JoinNode[R, R] => try {   // try the left side
-          j.replaceLeft(updateJoinTree(node, j.left))
+      case x: JoinNode[R, R] => try {   // try the left side
+          x.replaceLeft(updateJoinTree(node, x.left))
         } catch {
-          case e: ORMException =>         // try the right side
-            j.replaceRight(updateJoinTree(node, j.right))
+          case e: ORMException => x.replaceRight(updateJoinTree(node, x.right))  // try the right side
         }
-      case rel: RelationNode[R] => rel.join(node)
+      case x: RelationNode[R] => x.JOIN(node)
     }
 
   /**
@@ -99,10 +98,10 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    */
   protected def processTupleTree[N, P, C](tuple: Array[_], tree: RelationNode[N]): Unit =
     tree match {
-      case j: OneToManyJoin[P, C] =>
-        val pNode = j.left
-        val cNode = j.right
-        val a = j.association
+      case x: OneToManyJoin[P, C] =>
+        val pNode = x.left
+        val cNode = x.right
+        val a = x.association
         val pIndex = _projections.findIndexOf(p => p.node.alias == pNode.alias)
         val cIndex = _projections.findIndexOf(p => p.node.alias == cNode.alias)
         if (pIndex == -1 || cIndex == -1) return
@@ -117,18 +116,18 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
             children ++= List(child)
           tx.updateInverseCache(parent, a, children)
         }
-        processTupleTree(tuple, j.left)
-        processTupleTree(tuple, j.right)
-      case j: JoinNode[_, _] =>
-        processTupleTree(tuple, j.left)
-        processTupleTree(tuple, j.right)
+        processTupleTree(tuple, x.left)
+        processTupleTree(tuple, x.right)
+      case x: JoinNode[_, _] =>
+        processTupleTree(tuple, x.left)
+        processTupleTree(tuple, x.right)
       case _ =>
     }
   
   protected def prepareLimitOffsetPredicate: Predicate = {
     val n = rootNode.clone.as("__lo")
     val q = SELECT (n.id) FROM (n) LIMIT (_limit) OFFSET (_offset) ORDER_BY (_orders: _*)
-    return rootNode.id IN (q)  
+    rootNode.id IN (q)  
   }
 
   // ## Public Stuff
@@ -212,7 +211,7 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    * Renumber the aliases of all projections so that no confusions happen.
    */
   def projections: Seq[Projection[_]] = {
-    _projections.foreach(p => resetProjection(p))
+    _projections foreach resetProjection
     _projections
   }
 
@@ -231,8 +230,8 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    * Merge the *join tree* with *prefetch tree* to form an actual `FROM` clause.
    */
   def queryPlan: RelationNode[R] = _joinTree match {
-    case j: JoinNode[R, _] => replaceLeft(j.clone, _rootTree)
-    case r: RelationNode[R] => _rootTree
+    case x: JoinNode[R, _] => replaceLeft(x.clone, _rootTree)
+    case _: RelationNode[R] => _rootTree
   }
 
   /**
@@ -284,5 +283,4 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
   def toSql = mkSelect.toSql
 
   override def toString = queryPlan.toString
-
 }
