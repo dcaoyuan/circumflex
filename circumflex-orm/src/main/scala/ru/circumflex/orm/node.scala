@@ -31,17 +31,13 @@ abstract class RelationNode[R] extends SQLable with Cloneable {
    */
   def as(alias: String): this.type = {
     this._alias = alias
-    return this
+    this
   }
-
   def AS(alias: String): this.type = as(alias)
 
   // ### Projections
-
-  /**
-   * Construct a new `RecordProjection` for this node.
-   */
-  def * = new RecordProjection[R](this)
+  private lazy val wildcard = new RecordProjection[R](this)
+  def * = wildcard
 
   /**
    * Default projections for this node.
@@ -72,12 +68,12 @@ abstract class RelationNode[R] extends SQLable with Cloneable {
     findAssociation(node) match {
       case Some(a: Association[R, J]) =>  // many-to-one join
         new ManyToOneJoin[R, J](this, node, a, joinType)
-      case _ => node.findAssociation(this) match {
+      case _ =>
+        node.findAssociation(this) match {
           case Some(a: Association[J, R]) =>  // one-to-many join
             new OneToManyJoin[R, J](this, node, a, joinType)
           case _ =>
-            throw new ORMException("Failed to join " + this + " and " + node +
-                                   ": no associations found.")
+            throw new ORMException("Failed to join " + this + " and " + node + ": no associations found.")
         }
     }
 
@@ -211,12 +207,12 @@ abstract class JoinNode[L, R](
 
   def replaceLeft(newLeft: RelationNode[L]): this.type = {
     this._left = newLeft
-    return this
+    this
   }
 
   def replaceRight(newRight: RelationNode[R]): this.type = {
     this._right = newRight
-    return this
+    this
   }
 
   // ### Others
@@ -227,9 +223,11 @@ abstract class JoinNode[L, R](
    * Creates a deep copy of this node, cloning left and right nodes.
    * The underlying relations of nodes remain unchanged.
    */
-  override def clone(): this.type = super.clone()
-  .replaceLeft(this.left.clone)
-  .replaceRight(this.right.clone)
+  override def clone(): this.type = {
+    super.clone()
+    .replaceLeft(this.left.clone)
+    .replaceRight(this.right.clone)
+  }
 
   override def toString = "(" + left + " -> " + right + ")"
 }

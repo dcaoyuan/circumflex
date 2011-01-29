@@ -36,16 +36,15 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    * so that no confusions happen.
    */
   protected def resetProjection(projection: Projection[_]): Unit = projection match {
-    case a: AtomicProjection[_] => a.as("p_" + nextCounter)
-    case c: CompositeProjection[_] => c.subProjections.foreach(p => resetProjection(p))
+    case x: AtomicProjection[_] => x.AS("p_" + nextCounter)
+    case x: CompositeProjection[_] => x.subProjections foreach resetProjection
   }
 
   /**
    * Replace left-most node of specified `join` with specified `node`.
    */
-  protected def replaceLeft(join: JoinNode[R, _],
-                            node: RelationNode[R]): RelationNode[R] =
-                              join.left match {
+  protected def replaceLeft(join: JoinNode[R, _], node: RelationNode[R]): RelationNode[R] =
+    join.left match {
       case j: JoinNode[R, _] => replaceLeft(j, node)
       case r: RelationNode[R] => join.replaceLeft(node)
     }
@@ -54,10 +53,8 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    * Attempt to search the root tree of query plan for relations of specified `association`
    * and correspondingly update it if necessary.
    */
-  protected def updateRootTree[N, P, C](
-    node: RelationNode[N],
-    association: Association[C, P]): RelationNode[N] =
-      node match {
+  protected def updateRootTree[N, P, C](node: RelationNode[N], association: Association[C, P]): RelationNode[N] =
+    node match {
       case j: JoinNode[_, _] => j.replaceLeft(updateRootTree(j.left, association))
         .replaceRight(updateRootTree(j.right, association))
       case node: RelationNode[N] =>
@@ -73,8 +70,7 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
   /**
    * Prepare specified `node` and `association` to participate in prefetching.
    */
-  protected def preparePf[N](relation: Relation[N],
-                             association: Association[_, _]): RelationNode[N] = {
+  protected def preparePf[N](relation: Relation[N], association: Association[_, _]): RelationNode[N] = {
     val node = relation.as("pf_" + nextCounter)
     _projections ++= List(node.*)
     _prefetchSeq ++= List[Association[_,_]](association)
@@ -101,9 +97,8 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    * Extract the information for inverse associations from specified `tuple` using
    * specified `tree`, which should appear to be a subtree of query plan.
    */
-  protected def processTupleTree[N, P, C](
-    tuple: Array[_], tree: RelationNode[N]): Unit =
-      tree match {
+  protected def processTupleTree[N, P, C](tuple: Array[_], tree: RelationNode[N]): Unit =
+    tree match {
       case j: OneToManyJoin[P, C] =>
         val pNode = j.left
         val cNode = j.right
@@ -143,7 +138,7 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    */
   def add(predicates: Predicate*): Criteria[R] = {
     _restrictions ++= predicates.toList
-    return this
+    this
   }
   def add(expression: String, params: Pair[String, Any]*): Criteria[R] =
     add(prepareExpr(expression, params: _*))
@@ -153,14 +148,14 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    */
   def addOrder(orders: Order*): Criteria[R] = {
     _orders ++= orders.toList
-    return this
+    this
   }
   /**
    * Set the maximum amount of root records that will be returned by the query.
    */
   def limit(value: Int): Criteria[R] = {
     this._limit = value
-    return this
+    this
   }
 
   /**
@@ -168,7 +163,7 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    */
   def offset(value: Int): Criteria[R] = {
     this._offset = value
-    return this
+    this
   }
 
   /**
@@ -180,7 +175,7 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
       _rootTree = updateRootTree(_rootTree, association)
       // TODO also process prefetch list of both sides of association.
     }
-    return this
+    this
   }
 
   /**
@@ -188,17 +183,18 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    */
   def addJoin[N](node: RelationNode[N]): Criteria[R] = {
     _joinTree = updateJoinTree(node, _joinTree)
-    return this
+    this
   }
 
   /**
    * Make an SQL SELECT query from this criteria.
    */
-  def mkSelect: SQLQuery[Array[Any]] =
+  def mkSelect: SQLQuery[Array[Any]] ={
     SELECT(new UntypedTupleProjection(projections: _*))
-  .FROM(queryPlan)
-  .WHERE(predicate)
-  .ORDER_BY(_orders: _*)
+    .FROM(queryPlan)
+    .WHERE(predicate)
+    .ORDER_BY(_orders: _*)
+  }
 
   /**
    * Make a DML `UPDATE` query from this criteria. Only `WHERE` clause is used, all the
@@ -217,7 +213,7 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
    */
   def projections: Seq[Projection[_]] = {
     _projections.foreach(p => resetProjection(p))
-    return _projections
+    _projections
   }
 
   /**

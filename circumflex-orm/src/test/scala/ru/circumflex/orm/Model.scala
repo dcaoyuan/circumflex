@@ -18,7 +18,7 @@ object Model {
     inserts
     selects
 
-    testAvroWrite
+    //testAvroWrite
     testAvroRead
   }
 
@@ -34,7 +34,7 @@ object Model {
     val city = new City(country, "mossco")
     Cities.save(city)
     Cities.save(new City(country, "abc"))
-    Cities.save(new City(country, "def"))
+    Cities.save(new City(country, "efg"))
 
     val capital = new Capital(country, city)
     Capitals.save(capital)
@@ -72,6 +72,7 @@ object Model {
   }
 
   def testAvroWrite {
+    println("\n=== test avro writer ===")
     def writeTable[R](x: Relation[R]) {
       val records = SELECT (x.*) FROM (x) list()
       x.writeToAvro(records, new File(DIR, x.relationName + ".avro"))
@@ -81,8 +82,11 @@ object Model {
   }
 
   def testAvroRead {
+    println("\n=== test avro read ===")
     List(Countries, Cities, Capitals) foreach {x =>
-      x.readFromAvro(new File(DIR, x.relationName + ".avro")) foreach println
+      val records = SELECT (x.*) FROM (AVRO(x, DIR + "/" + x.relationName + ".avro")) list()
+      //val records = x.readFromAvro(new File(DIR, x.relationName + ".avro"))
+      records foreach {println(_)}
     }
   }
 }

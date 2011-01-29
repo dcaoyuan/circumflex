@@ -15,7 +15,7 @@ trait SimpleRowSource {
    * @throws SQLException
    */
   @throws(classOf[SQLException])
-  def readRow: Array[Object]
+  def readRow: Array[Any]
 
   /**
    * Close the row source.

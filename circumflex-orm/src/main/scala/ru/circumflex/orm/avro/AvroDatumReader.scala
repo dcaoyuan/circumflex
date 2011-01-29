@@ -15,7 +15,6 @@ import org.apache.avro.io.Decoder
 import org.apache.avro.io.ResolvingDecoder
 import org.apache.avro.util.Utf8
 import org.apache.avro.util.WeakIdentityHashMap
-import ru.circumflex.orm.Relation
 import scala.collection.JavaConversions._
 
 object AvroDatumReader {
@@ -74,10 +73,10 @@ object AvroDatumReader {
     }
   }
 
-  def apply[R](relation: Relation[R]) = new AvroDatumReader[R](null, null, relation)
+  def apply[R]() = new AvroDatumReader[R](null, null)
   /** Construct where the writer's and reader's schemas are the same. */
-  def apply[R](schema: Schema, relation: Relation[R]) = new AvroDatumReader[R](schema, schema, relation)
-  def apply[R](reader: Schema, writer: Schema, relation: Relation[R]) = new AvroDatumReader[R](reader, writer, relation)
+  def apply[R](schema: Schema) = new AvroDatumReader[R](schema, schema)
+  def apply[R](reader: Schema, writer: Schema) = new AvroDatumReader[R](reader, writer)
 }
 
 /**
@@ -85,7 +84,7 @@ object AvroDatumReader {
  * @param expected  reader's schema
  */
 import AvroDatumReader._
-class AvroDatumReader[R](private var actual: Schema, private var expected: Schema, relation: Relation[R]) extends DatumReader[R] {
+class AvroDatumReader[R](private var actual: Schema, private var expected: Schema) extends DatumReader[R] {
 
   override def setSchema(writer: Schema) {
     this.actual = writer
@@ -142,7 +141,7 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
   protected def read(old: Any, expected: Schema, in: ResolvingDecoder): Any = {
     import Schema.Type._
     expected.getType match {
-      case RECORD =>  readRecord(old.asInstanceOf[R], expected, in)
+      case RECORD =>  readRecord(old.asInstanceOf[AnyRef], expected, in)
       case ENUM =>    readEnum(expected, in)
       case ARRAY =>   readArray(old.asInstanceOf[AnyRef], expected, in)
       case MAP =>     readMap(old.asInstanceOf[AnyRef], expected, in)
@@ -163,7 +162,7 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
   /** Called to read a record instance. May be overridden for alternate record
    * representations.*/
   @throws(classOf[IOException])
-  protected def readRecord(old: R, expected: Schema, in: ResolvingDecoder): R = {
+  protected def readRecord(old: AnyRef, expected: Schema, in: ResolvingDecoder): AnyRef = {
     val record = newRecord(old, expected)
 
     for (field <- in.readFieldOrder) {
@@ -179,15 +178,15 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
   /** Called by the default implementation of {@link #readRecord} to set a
    * record fields value to a record instance.  The default implementation is
    * for {@link IndexedRecord}.*/
-  protected def setField(record: R, name: String, position: Int, value: Any) {
-    relation.setFieldValue(record.asInstanceOf[R], name, position, value)
+  protected def setField(record: AnyRef, name: String, position: Int, value: Any) {
+    record.asInstanceOf[IndexedRecord].put(position, value)
   }
 
   /** Called by the default implementation of {@link #readRecord} to retrieve a
    * record field value from a reused instance.  The default implementation is
    * for {@link IndexedRecord}.*/
-  protected def getField(record: R, name: String, position: Int) = {
-    relation.getFieldValue(record.asInstanceOf[R], name, position).asInstanceOf[AnyRef]
+  protected def getField(record: AnyRef, name: String, position: Int): AnyRef = {
+    record.asInstanceOf[IndexedRecord].get(position)
   }
 
   /** Called by the default implementation of {@link #readRecord} to remove a
@@ -307,10 +306,10 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
    * create a new instance that conforms to the schema. By default, this returns
    * a {@link GenericData.Record}.
    */
-  protected def newRecord(old: R, schema: Schema): R = {
+  protected def newRecord(old: AnyRef, schema: Schema): AnyRef = {
     old match {
-      case x: IndexedRecord if x.getSchema == schema => x.asInstanceOf[R]
-      case _ => relation.recordClass.newInstance
+      case x: IndexedRecord if x.getSchema == schema => x
+      case _ => new GenericData.Record(schema)
     }
   }
 

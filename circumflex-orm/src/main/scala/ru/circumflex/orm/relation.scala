@@ -12,6 +12,7 @@ import org.apache.avro.{Schema => AvroSchema}
 import java.io.File
 import java.lang.reflect.Method
 import java.sql.PreparedStatement
+import ru.circumflex.orm.avro.Avro
 import ru.circumflex.orm.avro.AvroDatumReader
 import ru.circumflex.orm.avro.AvroDatumWriter
 
@@ -39,13 +40,6 @@ object RelationRegistry {
 
 
 // ## Relation
-object AvroHelper {
-  val THROWABLE_MESSAGE = makeNullable(AvroSchema.create(AvroSchema.Type.STRING))
-
-  def makeNullable(schema: AvroSchema): AvroSchema = {
-    AvroSchema.createUnion(java.util.Arrays.asList(AvroSchema.create(AvroSchema.Type.NULL), schema))
-  }
-}
 
 abstract class Relation[R](implicit m: Manifest[R]) {
 
@@ -655,7 +649,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       avroFields.add(avroField)
     }
     if (error) { // add Throwable message
-      avroFields.add(new AvroSchema.Field("detailMessage", AvroHelper.THROWABLE_MESSAGE, null, null))
+      avroFields.add(new AvroSchema.Field("detailMessage", Avro.THROWABLE_MESSAGE, null, null))
     }
     schema.setFields(avroFields)
 
@@ -665,7 +659,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   protected def createAvroFieldSchema(field: Field[R, _]): AvroSchema = {
     val fieldSchema = AvroSchema.create(field.avroType)
     if (!field.notNull_?) { // nullable
-      AvroHelper.makeNullable(fieldSchema)
+      Avro.makeNullable(fieldSchema)
     } else {
       fieldSchema
     }
@@ -686,27 +680,27 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   }
 
   def writeToAvro(records: Seq[R], file: File) {
-    val writer = new DataFileWriter[R](AvroDatumWriter[R](this))//.setSyncInterval(syncInterval)
-    writer.create(avroSchema, file)
-    try {
-      records foreach writer.append
-    } finally {
-      writer.close
-    }
+//    val writer = new DataFileWriter[R](AvroDatumWriter[R](this))//.setSyncInterval(syncInterval)
+//    writer.create(avroSchema, file)
+//    try {
+//      records foreach writer.append
+//    } finally {
+//      writer.close
+//    }
   }
 
   def readFromAvro(file: File): Array[R] = {
     val records = ArrayList[R]()
 
-    val reader = new DataFileReader[R](file, AvroDatumReader[R](this))
-    try {
-      while (reader.hasNext) {
-        val record = reader.next(null.asInstanceOf[R])
-        records += record
-      }
-    } finally {
-      reader.close
-    }
+//    val reader = new DataFileReader[R](file, AvroDatumReader[R](this))
+//    try {
+//      while (reader.hasNext) {
+//        val record = reader.next(null.asInstanceOf[R])
+//        records += record
+//      }
+//    } finally {
+//      reader.close
+//    }
 
     records.toArray
   }

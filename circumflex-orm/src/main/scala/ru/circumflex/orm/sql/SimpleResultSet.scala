@@ -47,15 +47,6 @@ import java.sql.SQLXML
  */
 object SimpleResultSet {
 
-  def getSqlException(message: String, errorCode: Int): SQLException = {
-    val sqlstate = ErrorCode.getState(errorCode)
-    new SQLException(message, sqlstate, errorCode)
-  }
-
-  def getUnsupportedException(): SQLException = {
-    getSqlException("Feature not supported", ErrorCode.FEATURE_NOT_SUPPORTED_1)
-  }
-
   /**
    * This class holds the data of a result column.
    */
@@ -80,7 +71,7 @@ object SimpleResultSet {
      * INTERNAL
      */
     def getArray(map: java.util.Map[String, Class[_]]): Object = {
-      throw getUnsupportedException
+      throw DbException.getUnsupportedException
     }
 
     /**
@@ -88,7 +79,7 @@ object SimpleResultSet {
      */
     @throws(classOf[SQLException])
     def getArray(index: Long, count: Int): Object = {
-      throw getUnsupportedException
+      throw DbException.getUnsupportedException
     }
 
     /**
@@ -96,7 +87,7 @@ object SimpleResultSet {
      */
     @throws(classOf[SQLException])
     def getArray(index: Long, count: Int, map: java.util.Map[String, Class[_]]): Object = {
-      throw getUnsupportedException
+      throw DbException.getUnsupportedException
     }
 
     /**
@@ -122,7 +113,7 @@ object SimpleResultSet {
      */
     @throws(classOf[SQLException])
     def getResultSet: ResultSet = {
-      throw getUnsupportedException
+      throw DbException.getUnsupportedException
     }
 
     /**
@@ -130,7 +121,7 @@ object SimpleResultSet {
      */
     @throws(classOf[SQLException])
     def getResultSet(map: Map[String, Class[_]]): ResultSet = {
-      throw getUnsupportedException
+      throw DbException.getUnsupportedException
     }
 
     /**
@@ -138,7 +129,7 @@ object SimpleResultSet {
      */
     @throws(classOf[SQLException])
     def getResultSet(index: Long, count: Int): ResultSet = {
-      throw getUnsupportedException
+      throw DbException.getUnsupportedException
     }
 
     /**
@@ -146,7 +137,7 @@ object SimpleResultSet {
      */
     @throws(classOf[SQLException])
     def getResultSet(index: Long, count: Int, map: Map[String, Class[_]]): ResultSet = {
-      throw getUnsupportedException
+      throw DbException.getUnsupportedException
     }
 
     /**
@@ -174,8 +165,8 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   def this() = this(null)
 
-  private var _rows: java.util.ArrayList[Array[Object]] = if (source == null) new java.util.ArrayList[Array[Object]](4) else null
-  private var _currentRow: Array[Object] = _
+  private var _rows: java.util.ArrayList[Array[Any]] = if (source == null) new java.util.ArrayList[Array[Any]](4) else null
+  private var _currentRow: Array[Any] = _
   private var _rowId: Int = -1
   private var _wasNull: Boolean = _
   private var _columns: java.util.ArrayList[Column] = new java.util.ArrayList[Column](4)
@@ -192,13 +183,18 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    * @param scale the scale
    */
   def addColumn($name: String, sqlType: Int, precision: Int, scale: Int) {
-    if (_rows != null && _rows.size() > 0) {
-      throw new IllegalStateException("Cannot add a column after adding rows");
-    }
     val name = if ($name == null) {
       "C" + (_columns.size + 1)
     } else $name
-    _columns.add(Column(name, sqlType, precision, scale))
+    
+    addColumn(Column(name, sqlType, precision, scale))
+  }
+
+  def addColumn(column: Column) {
+    if (_rows != null && _rows.size() > 0) {
+      throw new IllegalStateException("Cannot add a column after adding rows");
+    }
+    _columns.add(column)
   }
 
   /**
@@ -207,7 +203,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    *
    * @param row the row as an array of objects
    */
-  def addRow(row: Object*) {
+  def addRow(row: Any*) {
     if (_rows == null) {
       throw new IllegalStateException("Cannot add a row when using RowSource");
     }
@@ -292,7 +288,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
       }
     }
     if (_autoClose) {
-      close()
+      close
     }
     false
   }
@@ -441,8 +437,8 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    * @return the value
    */
   @throws(classOf[SQLException])
-  def getObject(columnIndex: Int): Object = {
-    get(columnIndex)
+  def getObject(columnIndex: Int): AnyRef = {
+    get(columnIndex).asInstanceOf[AnyRef]
   }
 
   /**
@@ -963,7 +959,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def afterLast() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -971,7 +967,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def cancelRowUpdates() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -979,7 +975,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateNull(columnLabel: String) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -987,7 +983,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def deleteRow() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -995,7 +991,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def insertRow() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1003,7 +999,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def moveToCurrentRow() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1011,7 +1007,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def moveToInsertRow() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1019,7 +1015,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def refreshRow() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1027,7 +1023,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateRow() {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1035,7 +1031,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def first(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1043,7 +1039,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def isAfterLast(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1051,7 +1047,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def isBeforeFirst(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1059,7 +1055,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def isFirst(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1067,7 +1063,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def isLast(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1075,7 +1071,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def last(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1083,7 +1079,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def previous(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1091,7 +1087,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def rowDeleted(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1099,7 +1095,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def rowInserted(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1107,7 +1103,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def rowUpdated(): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1115,7 +1111,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def setFetchDirection(direction: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1123,7 +1119,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def setFetchSize(rows: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1131,7 +1127,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateNull(columnIndex: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1139,7 +1135,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def absolute(row: Int): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1147,7 +1143,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def relative(offset: Int): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1155,7 +1151,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateByte(columnIndex: Int, x: Byte) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1163,7 +1159,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateDouble(columnIndex: Int, x: Double) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1171,7 +1167,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateFloat(columnIndex: Int, x: Float) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1179,7 +1175,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateInt(columnIndex: Int, x: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1187,7 +1183,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateLong(columnIndex: Int, x: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1195,7 +1191,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateShort(columnIndex: Int, x: Short) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1203,7 +1199,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBoolean(columnIndex: Int, x: Boolean) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1211,7 +1207,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBytes(columnIndex: Int, x: Array[Byte]) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1240,7 +1236,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateAsciiStream(columnIndex: Int, x: InputStream, length: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1248,7 +1244,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBinaryStream(columnIndex: Int, x: InputStream, length: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1256,7 +1252,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getCharacterStream(columnIndex: Int): Reader = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1264,7 +1260,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateCharacterStream(columnIndex: Int, x: Reader, length: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1272,7 +1268,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateObject(columnIndex: Int, x: Object) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1280,7 +1276,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateObject(columnIndex: Int, x: Object, scale: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1288,7 +1284,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getCursorName: String = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1296,7 +1292,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateString(columnIndex: Int, x: String) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1304,7 +1300,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateByte(columnLabel: String, x: Byte) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1312,7 +1308,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateDouble(columnLabel: String, x: Double) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1320,7 +1316,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateFloat(columnLabel: String, x: Float) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1328,7 +1324,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateInt(columnLabel: String, x: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1336,7 +1332,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateLong(columnLabel: String, x: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1344,7 +1340,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateShort(columnLabel: String, x: Short) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1352,7 +1348,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBoolean(columnLabel: String, x: Boolean) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1360,7 +1356,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBytes(columnLabel: String, x: Array[Byte]) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1368,7 +1364,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getBigDecimal(columnIndex: Int, scale: Int): BigDecimal = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1376,7 +1372,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBigDecimal(columnIndex: Int, x: BigDecimal) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1384,7 +1380,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getURL(columnIndex: Int): URL = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1392,7 +1388,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateArray(columnIndex: Int, x: java.sql.Array) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1400,7 +1396,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getBlob(i: Int): Blob = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1408,7 +1404,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBlob(columnIndex: Int, x: Blob) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1416,7 +1412,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getClob(i: Int): Clob = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1424,7 +1420,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateClob(columnIndex: Int, x: Clob) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1432,7 +1428,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateDate(columnIndex: Int, x: Date) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1440,7 +1436,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getRef(i: Int): Ref = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1448,7 +1444,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateRef(columnIndex: Int, x: Ref) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1456,7 +1452,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateTime(columnIndex: Int, x: Time) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1464,7 +1460,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateTimestamp(columnIndex: Int, x: Timestamp) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1472,7 +1468,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getAsciiStream(columnLabel: String): InputStream = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1480,7 +1476,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getBinaryStream(columnLabel: String): InputStream = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1488,7 +1484,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getUnicodeStream(columnLabel: String): InputStream = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1496,7 +1492,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateAsciiStream(columnLabel: String, x: InputStream, length: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1504,7 +1500,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBinaryStream(columnLabel: String, x: InputStream, length: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1512,7 +1508,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getCharacterStream(columnLabel: String): Reader = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1520,7 +1516,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateCharacterStream(columnLabel: String, reader: Reader, length: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1528,7 +1524,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateObject(columnLabel: String, x: Object) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1536,7 +1532,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateObject(columnLabel: String, x: Object, scale: Int) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1544,7 +1540,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getObject(i: Int, map: Map[String, Class[_]]): Object = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1552,7 +1548,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateString(columnLabel: String, x: String) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1560,7 +1556,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getBigDecimal(columnLabel: String, scale: Int): BigDecimal = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1568,7 +1564,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBigDecimal(columnLabel: String, x: BigDecimal) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1576,7 +1572,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getURL(columnLabel: String): URL = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1584,7 +1580,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateArray(columnLabel: String, x: java.sql.Array) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1592,7 +1588,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getBlob(colName: String): Blob = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1600,7 +1596,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateBlob(columnLabel: String, x: Blob) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1608,7 +1604,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getClob(colName: String): Clob = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1616,7 +1612,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateClob(columnLabel: String, x: Clob) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1624,7 +1620,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateDate(columnLabel: String, x: Date) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1632,7 +1628,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getDate(columnIndex: Int, cal: Calendar): Date = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1640,7 +1636,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getRef(colName: String): Ref = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1648,7 +1644,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateRef(columnLabel: String, x: Ref) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1656,7 +1652,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateTime(columnLabel: String, x: Time) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1664,7 +1660,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getTime(columnIndex: Int, cal: Calendar): Time = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1672,7 +1668,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def updateTimestamp(columnLabel: String, x: Timestamp) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1680,7 +1676,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getTimestamp(columnIndex: Int, cal: Calendar): Timestamp = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1688,7 +1684,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getObject(colName: String, map: Map[String, Class[_]]): Object = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1696,7 +1692,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getDate(columnLabel: String, cal: Calendar): Date = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1704,7 +1700,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getTime(columnLabel: String, cal: Calendar): Time = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   /**
@@ -1712,7 +1708,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getTimestamp(columnLabel: String, cal: Calendar): Timestamp = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 
   // --- private -----------------------------
@@ -1721,19 +1717,19 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
   @throws(classOf[SQLException])
   private def checkColumnIndex(columnIndex: Int) {
     if (columnIndex < 0 || columnIndex >= _columns.size()) {
-      getSqlException("Invalid value at column index: " + (columnIndex + 1), ErrorCode.INVALID_VALUE_2)
+      DbException.getSqlException("Invalid value at column index: " + (columnIndex + 1), ErrorCode.INVALID_VALUE_2)
     }
   }
 
   @throws(classOf[SQLException])
-  private def get(columnIndex: Int): Object = {
+  private def get(columnIndex: Int): Any = {
     if (_currentRow == null) {
-      getSqlException("No data available at column index: " + (columnIndex + 1), ErrorCode.NO_DATA_AVAILABLE)
+      DbException.getSqlException("No data available at column index: " + (columnIndex + 1), ErrorCode.NO_DATA_AVAILABLE)
     }
     val columnIndex1 = columnIndex - 1
     checkColumnIndex(columnIndex1)
     val o = if (columnIndex1 < _currentRow.length) _currentRow(columnIndex1) else null
-    _wasNull = o == null;
+    _wasNull = o == null
     o
   }
 
@@ -1749,7 +1745,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getRowId(columnIndex: Int): RowId = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1759,7 +1755,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getRowId(columnLabel: String): RowId = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1769,7 +1765,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateRowId(columnIndex: Int, x: RowId) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1779,7 +1775,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateRowId(columnLabel: String, x: RowId) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1809,7 +1805,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNString(columnIndex: Int, nString: String) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1819,7 +1815,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNString(columnLabel: String, nString: String) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1829,7 +1825,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNClob(columnIndex: Int, nClob: NClob) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1839,7 +1835,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNClob(columnLabel: String, nClob: NClob) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1849,7 +1845,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getNClob(columnIndex: Int): NClob = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1859,7 +1855,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getNClob(columnLabel: String): NClob = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1869,7 +1865,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getSQLXML(columnIndex: Int): SQLXML = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1879,7 +1875,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getSQLXML(columnLabel: String): SQLXML = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1889,7 +1885,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateSQLXML(columnIndex: Int, xmlObject: SQLXML) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1899,7 +1895,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateSQLXML(columnLabel: String, xmlObject: SQLXML) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1929,7 +1925,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getNCharacterStream(columnIndex: Int): Reader = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1939,7 +1935,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def getNCharacterStream(columnLabel: String): Reader = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1949,7 +1945,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def unwrap[T](iface: Class[T]): T = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1959,7 +1955,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def isWrapperFor(iface: Class[_]): Boolean = {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1970,7 +1966,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
   @throws(classOf[SQLException])
   def updateAsciiStream(columnIndex: Int, x: InputStream)
   {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1980,7 +1976,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateAsciiStream(columnLabel: String, x: InputStream) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -1990,7 +1986,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateAsciiStream(columnIndex: Int, x: InputStream, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2000,7 +1996,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateAsciiStream(columnLabel: String, x: InputStream, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2010,7 +2006,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBinaryStream(columnIndex: Int, x: InputStream) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2020,7 +2016,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBinaryStream(columnLabel: String, x: InputStream) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2030,7 +2026,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBinaryStream(columnIndex: Int, x: InputStream, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2040,7 +2036,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBinaryStream(columnLabel: String, x: InputStream, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2050,7 +2046,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBlob(columnIndex: Int, x: InputStream) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2060,7 +2056,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBlob(columnLabel: String, x: InputStream) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2070,7 +2066,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBlob(columnIndex: Int, x: InputStream, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2080,7 +2076,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateBlob(columnLabel: String, x: InputStream, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2090,7 +2086,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateCharacterStream(columnIndex: Int, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2100,7 +2096,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateCharacterStream(columnLabel: String, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2110,7 +2106,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateCharacterStream(columnIndex: Int, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2120,7 +2116,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateCharacterStream(columnLabel: String, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2130,7 +2126,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateClob(columnIndex: Int, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2140,7 +2136,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateClob(columnLabel: String, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2150,7 +2146,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateClob(columnIndex: Int, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2160,7 +2156,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateClob(columnLabel: String, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2170,7 +2166,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNCharacterStream(columnIndex: Int, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2180,7 +2176,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNCharacterStream(columnLabel: String, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2190,7 +2186,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNCharacterStream(columnIndex: Int, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2200,7 +2196,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNCharacterStream(columnLabel: String, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2210,7 +2206,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNClob(columnIndex: Int, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2220,7 +2216,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNClob(columnLabel: String, x: Reader) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2230,7 +2226,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNClob(columnIndex: Int, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 
@@ -2240,7 +2236,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
 //## Java 1.6 begin ##
   @throws(classOf[SQLException])
   def updateNClob(columnLabel: String, x: Reader, length: Long) {
-    throw getUnsupportedException()
+    throw DbException.getUnsupportedException
   }
 //## Java 1.6 end ##
 

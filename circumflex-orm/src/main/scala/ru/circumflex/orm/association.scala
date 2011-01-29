@@ -74,17 +74,15 @@ class Association[R, F](val relation: Relation[R],
   def onDelete = _onDelete
   def onUpdate = _onUpdate
 
-  def onDelete(action: ForeignKeyAction): this.type = {
+  def ON_DELETE(action: ForeignKeyAction): this.type = {
     _onDelete = action
     this
   }
-  def ON_DELETE(action: ForeignKeyAction): this.type = onDelete(action)
 
-  def onUpdate(action: ForeignKeyAction): this.type = {
+  def ON_UPDATE(action: ForeignKeyAction): this.type = {
     _onUpdate = action
     this
   }
-  def ON_UPDATE(action: ForeignKeyAction): this.type = onUpdate(action)
 
   class InternalField extends Field[R, Long](relation, name, dialect.longType, org.apache.avro.Schema.Type.LONG) {
 

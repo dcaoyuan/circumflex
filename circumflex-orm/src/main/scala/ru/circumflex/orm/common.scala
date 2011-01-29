@@ -227,9 +227,7 @@ extends ParameterizedExpression {
 object JDBC {
   protected[orm] val sqlLog = Logger.get("ru.circumflex.orm")
 
-  def autoClose[A <: {def close(): Unit}, B](obj: A)
-  (actions: A => B)
-  (errors: Throwable => B): B =
+  def autoClose[A <: {def close(): Unit}, B](obj: A)(actions: A => B)(errors: Throwable => B): B =
     try {
       return actions(obj)
     } catch {
@@ -240,8 +238,7 @@ object JDBC {
       obj.close
     }
 
-  def auto[A <: {def close(): Unit}, B](obj: A)
-  (actions: A => B): B =
+  def auto[A <: {def close(): Unit}, B](obj: A)(actions: A => B): B =
     autoClose(obj)(actions)(throw _)
 }
 

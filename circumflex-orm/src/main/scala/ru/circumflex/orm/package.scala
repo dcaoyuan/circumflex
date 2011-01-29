@@ -1,7 +1,8 @@
 package ru.circumflex
 
-import _root_.ru.circumflex.orm._
-import ORM._
+
+import ru.circumflex.orm.ORM._
+import ru.circumflex.orm.avro.AvroNode
 import java.util.regex.Pattern
 
 // ## ORM package object
@@ -150,9 +151,13 @@ package object orm {
 
   // Query DSLs
 
-  def SELECT[T](projection: Projection[T]) = new Select(projection)
+  def SELECT[R](projection: Projection[R]) = new Select(projection)
   def INSERT_INTO[R](relation: Relation[R]) = new InsertSelectHelper(relation)
   def UPDATE[R](node: RelationNode[R]) = new Update(node)
   def DELETE[R](node: RelationNode[R]) = new Delete(node)
 
+
+  // functions
+  
+  def AVRO[R](relation: Relation[R], fileName: String) = new AvroNode[R](relation, fileName)
 }

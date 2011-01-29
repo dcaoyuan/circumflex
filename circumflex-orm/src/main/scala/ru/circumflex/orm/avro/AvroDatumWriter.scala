@@ -6,16 +6,16 @@ import org.apache.avro.AvroTypeException
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
 import org.apache.avro.generic.GenericFixed
+import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.io.DatumWriter
 import org.apache.avro.io.Encoder
-import ru.circumflex.orm.Relation
 import scala.collection.JavaConversions._
 
 object AvroDatumWriter {
-  def apply[R](relation: Relation[R]) = new AvroDatumWriter[R](relation.avroSchema, GenericData.get, relation)
+  def apply[R]() = new AvroDatumWriter[R](null, GenericData.get)
 }
 
-class AvroDatumWriter[R] private (private var _root: Schema, data: GenericData, relation: Relation[R]) extends DatumWriter[R] {
+class AvroDatumWriter[R] private (private var _root: Schema, data: GenericData) extends DatumWriter[R] {
 
   setSchema(_root)
   //public GenericDatumWriter() { this(GenericData.get()); }
@@ -88,9 +88,10 @@ class AvroDatumWriter[R] private (private var _root: Schema, data: GenericData, 
   }
 
   /** Called by the default implementation of {@link #writeRecord} to retrieve
-   * a record field value */
-  protected def getField(record: R, field: String, position: Int): Any = {
-    relation.getFieldValue(record, field, position)
+   * a record field value.  The default implementation is for {@link
+   * IndexedRecord}.*/
+  protected def getField(record: Any, field: String, position: Int): AnyRef = {
+    record.asInstanceOf[IndexedRecord].get(position)
   }
 
   /** Called to write an enum value.  May be overridden for alternate enum
