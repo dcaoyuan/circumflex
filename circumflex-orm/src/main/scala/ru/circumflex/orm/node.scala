@@ -39,11 +39,6 @@ abstract class RelationNode[R] extends SQLable with Cloneable {
   private lazy val wildcard = new RecordProjection[R](this)
   def * = wildcard
 
-  /**
-   * Default projections for this node.
-   */
-  def projections: Seq[Projection[_]] = List(*)
-
   // ### Criteria and simple queries
 
   def criteria = new Criteria(this)
@@ -155,7 +150,6 @@ class ProxyNode[R](protected[orm] var node: RelationNode[R]) extends RelationNod
     return this
   }
 
-  override def projections = node.projections
   override def * = node.*
 
   override def equals(obj: Any) = node.equals(obj)
@@ -171,7 +165,7 @@ class ProxyNode[R](protected[orm] var node: RelationNode[R]) extends RelationNod
     val newNode = super.clone().asInstanceOf[this.type]
     val n = node.clone().asInstanceOf[RelationNode[R]]
     newNode.node = n
-    return newNode
+    newNode
   }
 
 }
@@ -196,12 +190,6 @@ abstract class JoinNode[L, R](
   def on: String
 
   def sqlOn = dialect.on(this.on)
-
-  /**
-   * Join node returns projections of `left` node appended with projections
-   * of `right` node.
-   */
-  override def projections = left.projections ++ right.projections
 
   // ### Replacement methods
 
@@ -239,7 +227,8 @@ class ExplicitJoin[L, R](
   left: RelationNode[L],
   right: RelationNode[R],
   val on: String,
-  joinType: JoinType) extends JoinNode[L, R](left, right, joinType)
+  joinType: JoinType
+) extends JoinNode[L, R](left, right, joinType)
 
 /**
  * A join in many-to-one direction.
@@ -248,7 +237,8 @@ class ManyToOneJoin[L, R](
   childNode: RelationNode[L],
   parentNode: RelationNode[R],
   val association: Association[L, R],
-  joinType: JoinType) extends JoinNode[L, R](childNode, parentNode, joinType) {
+  joinType: JoinType
+) extends JoinNode[L, R](childNode, parentNode, joinType) {
   def on = childNode.alias + "." + association.name + " = " +
   parentNode.alias + "." + association.foreignRelation.PRIMARY_KEY.name
 }
@@ -260,7 +250,8 @@ class OneToManyJoin[L, R](
   parentNode: RelationNode[L],
   childNode: RelationNode[R],
   val association: Association[R, L],
-  joinType: JoinType) extends JoinNode[L, R](parentNode, childNode, joinType) {
+  joinType: JoinType
+) extends JoinNode[L, R](parentNode, childNode, joinType) {
   def on = childNode.alias + "." + association.name + " = " +
   parentNode.alias + "." + association.foreignRelation.PRIMARY_KEY.name
 }
