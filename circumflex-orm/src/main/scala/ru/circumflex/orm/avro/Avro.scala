@@ -61,10 +61,10 @@ object Avro {
     }
   }
 
-  def metaToSchema(meta: ResultSetMetaData): Schema = {
+  def metaToSchema(meta: ResultSetMetaData, name: String = "anonymous"): Schema = {
     val columnCount = meta.getColumnCount
 
-    val schema = Schema.createRecord("anonymous", null, "", false)
+    val schema = Schema.createRecord(name, null, "", false)
     val avroFields = new java.util.ArrayList[Schema.Field]()
     var i = 0
     while (i < columnCount) {

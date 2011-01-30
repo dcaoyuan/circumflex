@@ -226,7 +226,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
        * even when this Relation is extended by a object
        */
       val relation: Relation.this.type = Relation.this
-    }).as(alias)
+    }).AS(alias)
   def AS(alias: String) = as(alias)
 
   /**

@@ -262,7 +262,7 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
         ensureNodeAlias(x.left)
         ensureNodeAlias(x.right)
         x
-      case x: RelationNode[_] if x.alias == "this" => node.as(nextAlias)
+      case x: RelationNode[_] if x.alias == "this" => node.AS(nextAlias)
       case x => x
     }
 

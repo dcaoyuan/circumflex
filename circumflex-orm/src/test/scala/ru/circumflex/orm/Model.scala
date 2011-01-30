@@ -85,8 +85,7 @@ object Model {
     println("\n=== test avro read ===")
     List(Countries, Cities, Capitals) foreach {x =>
       val records = SELECT (x.*) FROM (AVRO(x, DIR + "/" + x.relationName + ".avro")) list()
-      //val records = x.readFromAvro(new File(DIR, x.relationName + ".avro"))
-      records foreach {println(_)}
+      records foreach println
     }
   }
 }

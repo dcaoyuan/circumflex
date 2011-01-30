@@ -125,7 +125,7 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
     }
   
   protected def prepareLimitOffsetPredicate: Predicate = {
-    val n = rootNode.clone.as("__lo")
+    val n = rootNode.clone.AS("__lo")
     val q = SELECT (n.id) FROM (n) LIMIT (_limit) OFFSET (_offset) ORDER_BY (_orders: _*)
     rootNode.id IN (q)  
   }

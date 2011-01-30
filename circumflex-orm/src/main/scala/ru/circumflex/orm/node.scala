@@ -17,23 +17,12 @@ abstract class RelationNode[R] extends SQLable with Cloneable {
    */
   val relation: Relation[R]
 
-  // ### Alias
-
   protected[orm] var _alias = "this"
-
-  /**
-   * An alias of this node. `this` is expanded to query-unique alias.
-   */
   def alias = _alias
-
-  /**
-   * Change the alias of this node.
-   */
-  def as(alias: String): this.type = {
+  def AS(alias: String): this.type = {
     this._alias = alias
     this
   }
-  def AS(alias: String): this.type = as(alias)
 
   // ### Projections
   private lazy val wildcard = new RecordProjection[R](this)
@@ -121,9 +110,9 @@ abstract class RelationNode[R] extends SQLable with Cloneable {
 class ProxyNode[R](protected[orm] var node: RelationNode[R]) extends RelationNode[R] {
   val relation = node.relation
   override def alias = node.alias
-  override def as(alias: String): this.type = {
-    node.as(alias)
-    return this
+  override def AS(alias: String): this.type = {
+    node.AS(alias)
+    this
   }
 
   override def * = node.*
@@ -154,7 +143,8 @@ class ProxyNode[R](protected[orm] var node: RelationNode[R]) extends RelationNod
 abstract class JoinNode[L, R](
   protected var _left: RelationNode[L],
   protected var _right: RelationNode[R],
-  protected var _joinType: JoinType) extends ProxyNode[L](_left) {
+  protected var _joinType: JoinType
+) extends ProxyNode[L](_left) {
 
   def left = _left
   def right = _right
