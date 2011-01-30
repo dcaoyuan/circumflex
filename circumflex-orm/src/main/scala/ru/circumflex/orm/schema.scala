@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
 
 // ## Schema Objects for DDL
 
@@ -8,8 +7,8 @@ import ORM._
 
 class Schema(val name: String) extends SchemaObject {
   def objectName = "SCHEMA " + name
-  def sqlCreate = dialect.createSchema(this)
-  def sqlDrop = dialect.dropSchema(this)
+  def sqlCreate = ORM.dialect.createSchema(this)
+  def sqlDrop = ORM.dialect.dropSchema(this)
 }
 
 // ### Constraints
@@ -22,9 +21,9 @@ abstract class Constraint[R](val relation: Relation[R],
 extends SchemaObject with SQLable {
 
   val objectName = "CONSTRAINT " + constraintName
-  val sqlCreate = dialect.alterTableAddConstraint(this)
-  val sqlDrop = dialect.alterTableDropConstraint(this)
-  val toSql = dialect.constraintDefinition(this)
+  val sqlCreate = ORM.dialect.alterTableAddConstraint(this)
+  val sqlDrop = ORM.dialect.alterTableDropConstraint(this)
+  val toSql = ORM.dialect.constraintDefinition(this)
 
   def sqlDefinition: String
 
@@ -38,7 +37,7 @@ class UniqueKey[R](relation: Relation[R],
                    name: String,
                    val fields: Seq[Field[R, _]]
 ) extends Constraint(relation, name) {
-  def sqlDefinition = dialect.uniqueKeyDefinition(this)
+  def sqlDefinition = ORM.dialect.uniqueKeyDefinition(this)
 }
 
 /**
@@ -67,14 +66,14 @@ class ForeignKey[R](relation: Relation[R],
   }
   def ON_UPDATE(action: ForeignKeyAction): this.type = onUpdate(action)
 
-  def sqlDefinition = dialect.foreignKeyDefinition(this)
+  def sqlDefinition = ORM.dialect.foreignKeyDefinition(this)
 }
 
 /**
  * An SQL `FOREIGN KEY` constraint.
  */
 class CheckConstraint[R](relation: Relation[R], name: String, val expression: String) extends Constraint(relation, name) {
-  def sqlDefinition = dialect.checkConstraintDefinition(this)
+  def sqlDefinition = ORM.dialect.checkConstraintDefinition(this)
 }
 
 class Index[R](val relation: Relation[R], val name: String, expressions: String*) extends SchemaObject {
@@ -115,14 +114,14 @@ class Index[R](val relation: Relation[R], val name: String, expressions: String*
   def WHERE(predicate: Predicate): this.type = where(predicate)
 
   val objectName = "INDEX " + name
-  val sqlCreate = dialect.createIndex(this)
-  val sqlDrop = dialect.dropIndex(this)
+  val sqlCreate = ORM.dialect.createIndex(this)
+  val sqlDrop = ORM.dialect.dropIndex(this)
 }
 
 class Sequence(val name: String) extends SchemaObject {
   val objectName = "SEQUENCE " + name
-  val sqlCreate = dialect.createSequence(this)
-  val sqlDrop = dialect.dropSequence(this)
+  val sqlCreate = ORM.dialect.createSequence(this)
+  val sqlDrop = ORM.dialect.dropSequence(this)
 }
 
 /**
@@ -160,7 +159,7 @@ class DefinitionHelper[R](relation: Relation[R], name: String) {
   def FLOAT(precision: Int = -1, scale: Int = 1) = new FloatField[R](relation, name, precision, scale)
   def DOUBLE(precision: Int = -1, scale: Int = 1) = new DoubleField[R](relation, name, precision, scale)
   def NUMERIC(precision: Int = -1, scale: Int = 1) = new NumericField[R](relation, name, precision, scale)
-  def TEXT() = new TextField[R](relation, name, dialect.textType)
+  def TEXT() = new TextField[R](relation, name, ORM.dialect.textType)
   def VARCHAR(length: Int = -1) = new TextField[R](relation, name, length)
   def VARBINARY(length: Int = -1) = new VarbinaryField[R](relation, name, length)
   def SERIALIZED[T](tpe: Class[T], length: Int = -1) = new SerializedField[R, T](relation, name, tpe, length)

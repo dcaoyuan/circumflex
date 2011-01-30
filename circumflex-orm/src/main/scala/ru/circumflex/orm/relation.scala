@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
 import JDBC._
 import java.sql.Statement
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
@@ -89,12 +88,12 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   /**
    * Schema is used to produce a qualified name for relation.
    */
-  val schema: Schema = defaultSchema
+  val schema: Schema = ORM.defaultSchema
 
   /**
    * Obtain a qualified name for this relation from dialect.
    */
-  val qualifiedName = dialect.relationQualifiedName(this)
+  val qualifiedName = ORM.dialect.relationQualifiedName(this)
 
   val validator = new RecordValidator(this)
 
@@ -268,8 +267,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     if (!_initialized) this.synchronized {
       if (!_initialized) try {
         findMembers(this.getClass)
-        dialect.initializeRelation(this)
-        this._fields foreach dialect.initializeField
+        ORM.dialect.initializeRelation(this)
+        this._fields foreach ORM.dialect.initializeField
         this._initialized = true
       } catch {
         case e: NullPointerException =>
@@ -342,7 +341,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   protected[orm] def setParams(record: R, st: PreparedStatement, fields: Seq[Field[R, _]]) = {
     var i = 0
     while (i < fields.size) {
-      typeConverter.write(st, fields(i).getValue(record), i + 1)
+      ORM.typeConverter.write(st, fields(i).getValue(record), i + 1)
       i += 1
     }
   }
@@ -354,7 +353,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    */
   def refetchLast(record: R) {
     val root = this
-    SELECT (root.*) FROM root WHERE (dialect.lastIdExpression(root)) unique match {
+    SELECT (root.*) FROM root WHERE (ORM.dialect.lastIdExpression(root)) unique match {
       case Some(r: R) => copyFields(r, record)
       case _ => throw new ORMException("Could not locate the last inserted row.")
     }
@@ -364,7 +363,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     val root = this
     val latestIdEq = if (latestId != -1)
       root.alias + "." + PRIMARY_KEY.name + " = " + latestId
-    else dialect.lastIdExpression(root)
+    else ORM.dialect.lastIdExpression(root)
     SELECT (root.*) FROM root WHERE (latestIdEq) unique match {
       case Some(r: R) => copyFields(r, record)
       case _ => throw new ORMException("Could not locate the last inserted row.")
@@ -403,9 +402,9 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
-      transactionManager.dml{conn =>
+      ORM.transactionManager.dml{conn =>
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
-        val sql = dialect.insertRecord(this, fs)
+        val sql = ORM.dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
           setParams(record, st, fs)
@@ -437,9 +436,9 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       if (records.length == 0) return 0
-      transactionManager.dml{conn =>
+      ORM.transactionManager.dml{conn =>
         val fs = this.fields.filter(_ != id)
-        val sql = dialect.insertRecord(this, fs)
+        val sql = ORM.dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
           var i = 0
@@ -454,7 +453,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
           var count = 0
           // RETURN_GENERATED_KEYS returns only one id (the first or the last)
           var keyId = if (keys.next) keys.getLong(1) else -1
-          val idIsOfTheLastRecord = dialect.returnGeneratedKeysIsTheLast
+          val idIsOfTheLastRecord = ORM.dialect.returnGeneratedKeysIsTheLast
           var j = if (idIsOfTheLastRecord) rows.length - 1 else 0
           while (j >= 0 && j < rows.length) {
             if (rows(j) > 0) {
@@ -487,13 +486,13 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
-      transactionManager.dml{conn =>
+      ORM.transactionManager.dml{conn =>
         val fs: Seq[Field[R, _]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
-        val sql = dialect.updateRecord(this, fs)
+        val sql = ORM.dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
           setParams(record, st, fs)
-          typeConverter.write(st, idOf(record), fs.size + 1)
+          ORM.typeConverter.write(st, idOf(record), fs.size + 1)
           st.executeUpdate
         }
       }
@@ -515,9 +514,9 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       if (records.length == 0) return 0
-      transactionManager.dml{conn =>
+      ORM.transactionManager.dml{conn =>
         val fs: Seq[Field[R, _]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
-        val sql = dialect.updateRecord(this, fs)
+        val sql = ORM.dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
           val paramIdx = fs.size + 1
@@ -525,7 +524,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
           while (i < records.length) {
             val record = records(i)
             setParams(record, st, fs)
-            typeConverter.write(st, idOf(record), paramIdx)
+            ORM.typeConverter.write(st, idOf(record), paramIdx)
             st.addBatch
             i += 1
           }
@@ -558,11 +557,11 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
-      transactionManager.dml{conn =>
-        val sql = dialect.deleteRecord(this)
+      ORM.transactionManager.dml{conn =>
+        val sql = ORM.dialect.deleteRecord(this)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
-          typeConverter.write(st, idOf(record), 1)
+          ORM.typeConverter.write(st, idOf(record), 1)
           st.executeUpdate
         }
       }
@@ -610,7 +609,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     val sql = "select * from " + qualifiedName + " where 1 = 0"
     sqlLog.debug(sql)
     try {
-      transactionManager.sql(sql){st =>
+      ORM.transactionManager.sql(sql){st =>
         try {
           val rs = st.executeQuery
           rs.close
@@ -638,12 +637,12 @@ abstract class Table[R: Manifest] extends Relation[R] with SchemaObject {
   val objectName = "TABLE " + qualifiedName
   def sqlDrop = {
     init
-    dialect.dropTable(this)
+    ORM.dialect.dropTable(this)
   }
   
   def sqlCreate = {
     init
-    dialect.createTable(this)
+    ORM.dialect.createTable(this)
   }
 }
 
@@ -656,12 +655,12 @@ abstract class View[R: Manifest] extends Relation[R] with SchemaObject {
   val objectName = "VIEW " + qualifiedName
   def sqlDrop = {
     init
-    dialect.dropView(this)
+    ORM.dialect.dropView(this)
   }
 
   def sqlCreate = {
     init
-    dialect.createView(this)
+    ORM.dialect.createView(this)
   }
 
   /**

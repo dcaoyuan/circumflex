@@ -1,8 +1,8 @@
 package ru.circumflex.orm
 
 import java.io.File
+import java.util.logging.Logger
 import xml._
-import ORM._
 
 /*!# XML (de)serialization
 
@@ -27,7 +27,9 @@ trait XmlSerializable[T] {
 class Deployment(val id: String,
                  val prefix: String,
                  val onExist: Deployment.OnExistAction,
-                 val entries: Seq[Node]) {
+                 val entries: Seq[Node]
+) {
+  private val log = Logger.getLogger(getClass.getName)
 
   def process(): Unit = try {
     entries.foreach(e => processNode(e, Nil))
@@ -83,7 +85,7 @@ class Deployment(val id: String,
           }
         } catch {
           case e: NoSuchMethodException =>
-            ormLog.warning("Could not process '" + n.label + "' of " + r.asInstanceOf[AnyRef].getClass)
+            log.warning("Could not process '" + n.label + "' of " + r.asInstanceOf[AnyRef].getClass)
         }
       case _ =>
     }
@@ -110,7 +112,7 @@ class Deployment(val id: String,
       field.setValue(r, value)
     }
   } catch {
-    case e: NoSuchMethodException => ormLog.warning("Could not process '" + k + "' of " + r.asInstanceOf[AnyRef].getClass)
+    case e: NoSuchMethodException => log.warning("Could not process '" + k + "' of " + r.asInstanceOf[AnyRef].getClass)
   }
 
   protected def prepareCriteria[R](r: R, n: Node): Criteria[R] = {

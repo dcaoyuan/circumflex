@@ -1,7 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
-
 // ## Association
 
 class Association[R, F](val relation: Relation[R],
@@ -84,7 +82,7 @@ class Association[R, F](val relation: Relation[R],
     this
   }
 
-  class InternalField extends Field[R, Long](relation, name, dialect.longType, org.apache.avro.Schema.Type.LONG) {
+  class InternalField extends Field[R, Long](relation, name, ORM.dialect.longType, org.apache.avro.Schema.Type.LONG) {
 
     override def getValue(from: R): Long = {
       recField match {

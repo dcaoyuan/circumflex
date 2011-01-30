@@ -2,7 +2,7 @@ package ru.circumflex.orm
 
 import java.sql.Connection
 import JDBC._
-import ORM._
+import java.util.logging.Logger
 
 // ## DDL stuff
 
@@ -11,6 +11,7 @@ import ORM._
  */
 class DDLUnit {
   import DDLUnit._
+  private val log = Logger.getLogger(getClass.getName)
 
   // ### Objects
 
@@ -99,7 +100,7 @@ class DDLUnit {
       if (o.isInstanceOf[Relation[_]]) o.asInstanceOf[Relation[_]].invalideCaches
 
       val sql = o.sqlDrop
-      ormLog.info(sql)
+      log.info(sql)
       autoClose(conn.prepareStatement(sql)){st =>
         st.executeUpdate
         _msgs :+= InfoMsg("DROP "  + o.objectName + ": OK", sql)
@@ -110,7 +111,7 @@ class DDLUnit {
   protected def createObjects(objects: Seq[SchemaObject], conn: Connection) =
     for (o <- objects) {
       val sql = o.sqlCreate
-      ormLog.info(sql)
+      log.info(sql)
       autoClose(conn.prepareStatement(sql)){st =>
         st.executeUpdate
         _msgs :+= InfoMsg("CREATE " + o.objectName + ": OK", sql)
@@ -131,10 +132,10 @@ class DDLUnit {
       // Execute a script.
       dropObjects(postAuxes, conn)
       dropObjects(views, conn)
-      if (dialect.supportsDropConstraints_?) dropObjects(constraints, conn)
+      if (ORM.dialect.supportsDropConstraints_?) dropObjects(constraints, conn)
       dropObjects(tables, conn)
       dropObjects(preAuxes, conn)
-      if (dialect.supportsSchema_?) dropObjects(schemata, conn)
+      if (ORM.dialect.supportsSchema_?) dropObjects(schemata, conn)
       // Restore auto-commit.
       conn.setAutoCommit(autoCommit)
       return this
@@ -152,7 +153,7 @@ class DDLUnit {
     val autoCommit = conn.getAutoCommit
     conn.setAutoCommit(true)
     // Execute a script.
-    if (dialect.supportsSchema_?) createObjects(schemata, conn)
+    if (ORM.dialect.supportsSchema_?) createObjects(schemata, conn)
     createObjects(preAuxes, conn)
     createObjects(tables, conn)
     createObjects(constraints, conn)
@@ -166,7 +167,7 @@ class DDLUnit {
   }
 
   def setReferentialIntegrity(enable: Boolean, conn: Connection) {
-    val sql = dialect.setReferentialIntegrity(enable)
+    val sql = ORM.dialect.setReferentialIntegrity(enable)
     autoClose(conn.prepareStatement(sql)) {st =>
       st.executeUpdate
       _msgs :+= InfoMsg("OK: ", sql)

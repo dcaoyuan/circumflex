@@ -2,7 +2,7 @@ package ru.circumflex.orm
 
 import java.sql.{PreparedStatement, Connection}
 import collection.mutable.HashMap
-import ORM._
+import java.util.logging.Logger
 
 // ## Transaction management
 
@@ -36,6 +36,8 @@ import ORM._
  * thread-locally current transaction.
  */
 trait TransactionManager {
+  private val log = Logger.getLogger(getClass.getName)
+  
   private val threadLocalContext = new ThreadLocal[StatefulTransaction]
 
   /**
@@ -91,18 +93,18 @@ trait TransactionManager {
       block
       if (transaction.live_?) {
         transaction.commit
-        ormLog.debug("Committed current transaction.")
+        log.fine("Committed current transaction.")
       }
     } catch {
       case e =>
         if (transaction.live_?) {
           transaction.rollback
-          ormLog.error("Rolled back current transaction.")
+          log.warning("Rolled back current transaction.")
         }
         throw e
     } finally if (transaction.live_?) {
       transaction.close
-      ormLog.debug("Closed current connection.")
+      log.fine("Closed current connection.")
       setTransaction(prevTx)
     }
   }

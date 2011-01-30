@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
 import java.lang.String
 
 // ## Relation Node
@@ -96,7 +95,7 @@ abstract class RelationNode[R] extends SQLable with Cloneable {
    */
   override def clone(): this.type = super.clone.asInstanceOf[this.type]
 
-  def toSql = dialect.alias(relation.qualifiedName, alias)
+  def toSql = ORM.dialect.alias(relation.qualifiedName, alias)
 
   override def toString = toSql
 }
@@ -155,7 +154,7 @@ abstract class JoinNode[L, R](
    */
   def on: String
 
-  def sqlOn = dialect.on(this.on)
+  def sqlOn = ORM.dialect.on(this.on)
 
   // ### Replacement methods
 
@@ -171,7 +170,7 @@ abstract class JoinNode[L, R](
 
   // ### Others
 
-  override def toSql = dialect.join(this)
+  override def toSql = ORM.dialect.join(this)
 
   /**
    * Creates a deep copy of this node, cloning left and right nodes.

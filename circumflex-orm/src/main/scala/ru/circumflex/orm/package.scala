@@ -1,13 +1,13 @@
 package ru.circumflex
 
 
-import ru.circumflex.orm.ORM._
 import ru.circumflex.orm.avro.AvroNode
 import java.util.regex.Pattern
 
 // ## ORM package object
 
 package object orm {
+  import ru.circumflex.orm.ORM._
 
   def tx = transactionManager.getTransaction
   def TX = tx

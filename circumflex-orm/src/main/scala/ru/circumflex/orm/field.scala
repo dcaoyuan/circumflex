@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -35,7 +34,7 @@ class Field[R, T](val relation: Relation[R],
   def REFERENCES[F](toRelation: Relation[F]): Association[R, F] =
     new Association[R, F](relation, name, toRelation)
 
-  def toSql = dialect.columnDefinition(this)
+  def toSql = ORM.dialect.columnDefinition(this)
 
   // Should the `UNIQUE` constraint be generated for this field?
   protected var _unique: Boolean = false
@@ -122,7 +121,7 @@ trait AutoIncrementable[R, T] extends Field[R, T] {
 class AutoPrimaryKeyField[R](relation: Relation[R]
 ) extends LongField(relation, "id") {
   _autoIncrement = true
-  override def defaultExpression = Some(dialect.defaultExpression(this))
+  override def defaultExpression = Some(ORM.dialect.defaultExpression(this))
 }
 
 abstract class XmlSerializableField[R, T](relation: Relation[R], name: String, sqlType: String, avroType: AvroSchema.Type
@@ -131,72 +130,72 @@ abstract class XmlSerializableField[R, T](relation: Relation[R], name: String, s
 }
 
 class TinyintField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Byte](relation, name, dialect.tinyintType, AvroSchema.Type.INT) {
+) extends XmlSerializableField[R, Byte](relation, name, ORM.dialect.tinyintType, AvroSchema.Type.INT) {
   def fromXml(string: String) = string.toByte
 }
 
 class IntField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Int](relation, name, dialect.integerType, AvroSchema.Type.INT) with AutoIncrementable[R, Int] {
+) extends XmlSerializableField[R, Int](relation, name, ORM.dialect.integerType, AvroSchema.Type.INT) with AutoIncrementable[R, Int] {
   def fromXml(string: String) = string.toInt
 }
 
 class LongField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Long](relation, name, dialect.longType, AvroSchema.Type.LONG) with AutoIncrementable[R, Long] {
+) extends XmlSerializableField[R, Long](relation, name, ORM.dialect.longType, AvroSchema.Type.LONG) with AutoIncrementable[R, Long] {
   def fromXml(string: String) = string.toLong
 }
 
 class FloatField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
-) extends XmlSerializableField[R, Float](relation, name, dialect.floatType(precision, scale), AvroSchema.Type.FLOAT) {
+) extends XmlSerializableField[R, Float](relation, name, ORM.dialect.floatType(precision, scale), AvroSchema.Type.FLOAT) {
   def fromXml(string: String) = string.toFloat
 }
 
 class DoubleField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
-) extends XmlSerializableField[R, Double](relation, name, dialect.doubleType(precision, scale), AvroSchema.Type.DOUBLE) {
+) extends XmlSerializableField[R, Double](relation, name, ORM.dialect.doubleType(precision, scale), AvroSchema.Type.DOUBLE) {
   def fromXml(string: String) = string.toDouble
 }
 
 class NumericField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
-) extends XmlSerializableField[R, Double](relation, name, dialect.numericType(precision, scale), AvroSchema.Type.DOUBLE) {
+) extends XmlSerializableField[R, Double](relation, name, ORM.dialect.numericType(precision, scale), AvroSchema.Type.DOUBLE) {
   def fromXml(string: String) = string.toDouble
 }
 
 class TextField[R](relation: Relation[R], name: String, sqlType: String
 ) extends XmlSerializableField[R, String](relation, name, sqlType, AvroSchema.Type.STRING) {
-  def this(relation: Relation[R], name: String, length: Int = -1) = this(relation, name, dialect.varcharType(length))
+  def this(relation: Relation[R], name: String, length: Int = -1) = this(relation, name, ORM.dialect.varcharType(length))
   def fromXml(string: String) = string
 }
 
 class VarbinaryField[R](relation: Relation[R], name: String, sqlType: String
 ) extends XmlSerializableField[R, Array[Byte]](relation, name, sqlType, AvroSchema.Type.BYTES) {
-  def this(relation: Relation[R], name: String, length: Int = -1) = this(relation, name, dialect.varbinaryType(length))
+  def this(relation: Relation[R], name: String, length: Int = -1) = this(relation, name, ORM.dialect.varbinaryType(length))
   def fromXml(string: String) = string.getBytes
 }
 
 class BooleanField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Boolean](relation, name, dialect.booleanType, AvroSchema.Type.BOOLEAN) {
+) extends XmlSerializableField[R, Boolean](relation, name, ORM.dialect.booleanType, AvroSchema.Type.BOOLEAN) {
   def fromXml(string: String) = string.toBoolean
 }
 
 class TimestampField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.timestampType, AvroSchema.Type.LONG) {
+) extends XmlSerializableField[R, Date](relation, name, ORM.dialect.timestampType, AvroSchema.Type.LONG) {
   def fromXml(string: String) = new Date(java.sql.Timestamp.valueOf(string).getTime)
   override def toXml(value: Date) = new java.sql.Timestamp(value.getTime).toString
 }
 
 class DateField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.dateType, AvroSchema.Type.LONG) {
+) extends XmlSerializableField[R, Date](relation, name, ORM.dialect.dateType, AvroSchema.Type.LONG) {
   def fromXml(string: String) = new Date(java.sql.Date.valueOf(string).getTime)
   override def toXml(value: Date) = new java.sql.Date(value.getTime).toString
 }
 
 class TimeField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, Date](relation, name, dialect.timeType, AvroSchema.Type.LONG) {
+) extends XmlSerializableField[R, Date](relation, name, ORM.dialect.timeType, AvroSchema.Type.LONG) {
   def fromXml(string: String) = new Date(java.sql.Time.valueOf(string).getTime)
   override def toXml(value: Date) = new java.sql.Time(value.getTime).toString
 }
 
 class XmlField[R](relation: Relation[R], name: String
-) extends XmlSerializableField[R, NodeSeq](relation, name, dialect.xmlType, AvroSchema.Type.STRING) {
+) extends XmlSerializableField[R, NodeSeq](relation, name, ORM.dialect.xmlType, AvroSchema.Type.STRING) {
   def fromXml(str: String): NodeSeq = try XML.loadString(str) catch {case _ => null}
   override def read(rs: ResultSet, alias: String) = Option(fromXml(rs.getString(alias)))
 }
@@ -209,7 +208,7 @@ class XmlField[R](relation: Relation[R], name: String
  *   when read from avro, this field will be setValue by ByteBuffer
  */
 class SerializedField[R, O](relation: Relation[R], name: String, tpe: Class[O], length: Int = -1
-) extends Field[R, Array[Byte]](relation, name, dialect.varbinaryType(length), AvroSchema.Type.BYTES) {
+) extends Field[R, Array[Byte]](relation, name, ORM.dialect.varbinaryType(length), AvroSchema.Type.BYTES) {
 
   override def getValue(from: R): Array[Byte] = {
     val trueValue = _getValue(from).asInstanceOf[O]

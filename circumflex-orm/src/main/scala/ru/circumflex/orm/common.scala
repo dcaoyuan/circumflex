@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
 import net.lag.logging.Logger
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
@@ -27,7 +26,7 @@ trait ParameterizedExpression extends SQLable {
    * Render this query by replacing parameter placeholders with actual values.
    */
   def toInlineSql: String = parameters.foldLeft(toSql)((sql, p) =>
-    sql.replaceFirst("\\?", typeConverter.escape(p)))
+    sql.replaceFirst("\\?", ORM.typeConverter.escape(p)))
 
   // Equality and others.
 
@@ -199,16 +198,16 @@ extends ParameterizedExpression {
 
   // Specificator (`ASC` or `DESC`).
 
-  protected[orm] var _specificator = dialect.asc
+  protected[orm] var _specificator = ORM.dialect.asc
 
   def asc: this.type = {
-    this._specificator = dialect.asc
+    this._specificator = ORM.dialect.asc
     return this
   }
   def ASC: this.type = asc
 
   def desc: this.type = {
-    this._specificator = dialect.desc
+    this._specificator = ORM.dialect.desc
     return this
   }
   def DESC: this.type = desc

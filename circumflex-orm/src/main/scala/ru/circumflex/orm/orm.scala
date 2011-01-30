@@ -3,10 +3,9 @@ package ru.circumflex.orm
 import com.mchange.v2.c3p0.ComboPooledDataSource
 import java.sql.{Timestamp, PreparedStatement, ResultSet, Connection}
 import java.util.Date
+import java.util.logging.Logger
 import javax.naming.InitialContext
 import javax.sql.DataSource
-import ORM._
-import net.lag.logging.Logger
 import org.aiotrade.lib.util.config.Config
 import org.aiotrade.lib.util.config.ConfigurationException
 
@@ -18,8 +17,7 @@ import org.aiotrade.lib.util.config.ConfigurationException
  */
 object ORM {
 
-  protected[orm] val ormLog = Logger.get("ru.circumflex.orm")
-  private val config = Config()
+  val config = Config()
 
   // ### Global Configuration Objects
 
@@ -98,7 +96,6 @@ trait ConnectionProvider {
    * Open new JDBC connection.
    */
   def openConnection: Connection
-
 }
 
 /**
@@ -126,8 +123,9 @@ trait ConnectionProvider {
  *   [c3p0]: http://www.mchange.com/projects/c3p0
  *   [c3p0-cfg]: http://www.mchange.com/projects/c3p0/index.html#configuration_properties
  */
-class DefaultConnectionProvider extends ConnectionProvider {
-  private val config = Config()
+object DefaultConnectionProvider extends ConnectionProvider {
+  import ORM._
+  private val log = Logger.getLogger(getClass.getName)
 
   protected val isolation: Int = config.getString("orm.connection.isolation") match {
     case Some("none") => Connection.TRANSACTION_NONE
@@ -136,7 +134,7 @@ class DefaultConnectionProvider extends ConnectionProvider {
     case Some("repeatable_read") => Connection.TRANSACTION_REPEATABLE_READ
     case Some("serializable") => Connection.TRANSACTION_SERIALIZABLE
     case _ => {
-        ormLog.info("Using READ COMMITTED isolation, override 'orm.connection.isolation' if necesssary.")
+        log.info("Using READ COMMITTED isolation, override 'orm.connection.isolation' if necesssary.")
         Connection.TRANSACTION_READ_COMMITTED
       }
   }
@@ -149,11 +147,11 @@ class DefaultConnectionProvider extends ConnectionProvider {
     case Some(jndiName: String) => {
         val ctx = new InitialContext
         val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
-        ormLog.info("Using JNDI datasource ({}).", jndiName)
+        log.info("Using JNDI datasource: " + jndiName)
         ds
       }
     case _ => {
-        ormLog.info("Using c3p0 connection pooling.")
+        log.info("Using c3p0 connection pooling.")
         val driver = config.getString("orm.connection.driver") match {
           case Some(s: String) => s
           case _ =>
@@ -211,8 +209,6 @@ class DefaultConnectionProvider extends ConnectionProvider {
 
 }
 
-object DefaultConnectionProvider extends DefaultConnectionProvider
-
 // ### Type converter
 
 /**
@@ -221,7 +217,8 @@ object DefaultConnectionProvider extends DefaultConnectionProvider
  * provide your own implementation.
  */
 trait TypeConverter {
-
+  import ORM._
+  
   /**
    * Read a value from specified `ResultSet` at specified column `alias`.
    */

@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
 import java.sql.ResultSet
 
 // ## Projection Basics
@@ -32,7 +31,7 @@ trait AtomicProjection[T] extends Projection[T] {
    */
   private var _alias: String = "this"
 
-  def read(rs: ResultSet) = typeConverter.read(rs, _alias).asInstanceOf[T]
+  def read(rs: ResultSet) = ORM.typeConverter.read(rs, _alias).asInstanceOf[T]
 
   protected[orm] def alias = _alias
   def AS(alias: String): this.type = {
@@ -78,7 +77,7 @@ trait CompositeProjection[R] extends Projection[R] {
  */
 class ExpressionProjection[T](val expression: String) extends AtomicProjection[T] {
 
-  def toSql = dialect.alias(expression, alias)
+  def toSql = ORM.dialect.alias(expression, alias)
 
   override def equals(obj: Any) = obj match {
     case p: ExpressionProjection[T] =>
@@ -99,9 +98,9 @@ class FieldProjection[R, T](val node: RelationNode[R], val field: Field[R, T]) e
   /**
    * Returns a column name qualified with node's alias.
    */
-  def expr = dialect.qualifyColumn(field, node.alias)
+  def expr = ORM.dialect.qualifyColumn(field, node.alias)
 
-  def toSql = dialect.alias(expr, alias)
+  def toSql = ORM.dialect.alias(expr, alias)
 
   override def equals(obj: Any) = obj match {
     case p: FieldProjection[R, T] =>

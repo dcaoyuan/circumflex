@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import ORM._
 import JDBC._
 import java.sql.ResultSet
 import java.sql.PreparedStatement
@@ -33,7 +32,7 @@ trait Query extends SQLable with ParameterizedExpression with Cloneable {
   def setParams(st: PreparedStatement, startIndex: Int): Int = {
     var paramsCounter = startIndex
     parameters foreach {p =>
-      typeConverter.write(st, convertNamedParam(p), paramsCounter)
+      ORM.typeConverter.write(st, convertNamedParam(p), paramsCounter)
       paramsCounter += 1
     }
     paramsCounter
@@ -146,7 +145,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
     val sql = toSql
     sqlLog.debug(sql)
     
-    transactionManager.sql(sql){st =>
+    ORM.transactionManager.sql(sql){st =>
       setParams(st, 1)
       auto(st.executeQuery)(postAction)
     }
@@ -373,7 +372,7 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
     this
   }
 
-  def toSql = dialect.select(this)
+  def toSql = ORM.dialect.select(this)
 
 }
 
@@ -387,7 +386,7 @@ trait DMLQuery extends Query {
   /**
    * Execute a query and return the number of affected rows.
    */
-  def execute(): Int = transactionManager.dml{conn =>
+  def execute(): Int = ORM.transactionManager.dml{conn =>
     val sql = toSql
     sqlLog.debug(sql)
     auto(conn.prepareStatement(sql)){st =>
@@ -416,7 +415,7 @@ class InsertSelect[R](val relation: Relation[R], val query: SQLQuery[_]) extends
   if (relation.readOnly_?)
     throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
   def parameters = query.parameters
-  def toSql: String = dialect.insertSelect(this)
+  def toSql: String = ORM.dialect.insertSelect(this)
 }
 
 /**
@@ -447,7 +446,7 @@ class Delete[R](val node: RelationNode[R]) extends DMLQuery {
 
   // ### Miscellaneous
   def parameters = _where.parameters
-  def toSql: String = dialect.delete(this)
+  def toSql: String = ORM.dialect.delete(this)
 }
 
 // ## UPDATE query
@@ -486,7 +485,7 @@ class Update[R](val node: RelationNode[R]) extends DMLQuery {
   // ### Miscellaneous
 
   def parameters = _setClause.map(_._2) ++ _where.parameters
-  def toSql: String = dialect.update(this)
+  def toSql: String = ORM.dialect.update(this)
 
 }
 
