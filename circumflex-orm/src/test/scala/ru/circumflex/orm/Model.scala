@@ -12,13 +12,11 @@ object Model {
 
 
   def main(args: Array[String]) {
-    List(Countries, Cities, Capitals) foreach {table => println(table.avroSchema.toString)}
-
     schema
     inserts
     selects
 
-    //testAvroWrite
+    testAvroWrite
     testAvroRead
   }
 
@@ -72,13 +70,12 @@ object Model {
   }
 
   def testAvroWrite {
-    println("\n=== test avro writer ===")
-    def writeTable[R](x: Relation[R]) {
-      val records = SELECT (x.*) FROM (x) list()
-      x.writeToAvro(records, new File(DIR, x.relationName + ".avro"))
+    println("\n=== test avro write ===")
+    def writeTable(x: Relation[_]) {
+      SELECT (x.*) FROM (x) toAvro(DIR + "/" + x.relationName + ".avro")
     }
 
-    List(Countries, Cities, Capitals) foreach {x => writeTable(x)}
+    List(Countries, Cities, Capitals) foreach writeTable
   }
 
   def testAvroRead {

@@ -15,6 +15,8 @@ import org.apache.avro.file.DataFileReader
 import org.apache.avro.file.DataFileWriter
 import org.apache.avro.generic.GenericData
 import org.apache.avro.generic.GenericRecord
+import ru.circumflex.orm.Field
+import ru.circumflex.orm.Relation
 import ru.circumflex.orm.sql.DbException
 import ru.circumflex.orm.sql.ErrorCode
 import ru.circumflex.orm.sql.SimpleResultSet
@@ -34,7 +36,7 @@ object Avro {
     Schema.createUnion(java.util.Arrays.asList(Schema.create(Schema.Type.NULL), schema))
   }
 
-  def schemFieldToColumn(field: Schema.Field): Column = {
+  def schemaFieldToColumn(field: Schema.Field): Column = {
     import Schema.Type
     field.schema.getType match {
       case Type.BOOLEAN => Column(field.name, Types.BOOLEAN,   Integer.MAX_VALUE, 0)
@@ -61,7 +63,7 @@ object Avro {
     }
   }
 
-  def metaToSchema(meta: ResultSetMetaData, name: String = "anonymous"): Schema = {
+  def metaToSchema(meta: ResultSetMetaData, name: String): Schema = {
     val columnCount = meta.getColumnCount
 
     val schema = Schema.createRecord(name, null, "", false)
@@ -82,6 +84,42 @@ object Avro {
   }
 
   def apply() = new Avro
+
+  // --- utilies for reference only
+  
+  protected def createAvroSchema(relation: Relation[_]): Schema = {
+    val recordClass = relation.recordClass
+    val name = recordClass.getSimpleName
+    val space = if (recordClass.getEnclosingClass != null) { // nested class
+      recordClass.getEnclosingClass.getName + "$"
+    } else {
+      Option(recordClass.getPackage) map (_.getName) getOrElse ""
+    }
+    val error = classOf[Throwable].isAssignableFrom(recordClass)
+
+    val schema = Schema.createRecord(name, null, space, error)
+    val avroFields = new java.util.ArrayList[Schema.Field]()
+    for (field <- relation.fields) {
+      val fieldSchema = createAvroFieldSchema(field)
+      val avroField = new Schema.Field(field.name, fieldSchema, null, null)
+      avroFields.add(avroField)
+    }
+    if (error) { // add Throwable message
+      avroFields.add(new Schema.Field("detailMessage", Avro.THROWABLE_MESSAGE, null, null))
+    }
+    schema.setFields(avroFields)
+
+    schema
+  }
+
+  protected def createAvroFieldSchema(field: Field[_, _]): Schema = {
+    val fieldSchema = Schema.create(field.avroType)
+    if (!field.notNull_?) { // nullable
+      Avro.makeNullable(fieldSchema)
+    } else {
+      fieldSchema
+    }
+  }
 }
 
 import Avro._
@@ -94,16 +132,63 @@ class Avro private () extends SimpleRowSource {
   private var writer: DataFileWriter[AnyRef] = _
   private var record: GenericRecord = _ // reusable record
 
-
   private var schemaFields = Map[String, Schema.Field]()
 
+  /**
+   * Writes the result set to a file in the CSV format. The result set is read
+   * using the following loop:
+   *
+   * <pre>
+   * while (rs.next()) {
+   *     writeRow(row);
+   * }
+   * </pre>
+   *
+   * @param outputFileName the name of the csv file
+   * @param rs the result set - the result set must be positioned before the
+   *          first row.
+   * @param charset the charset or null to use the system default charset
+   *          (see system property file.encoding)
+   * @return the number of rows written
+   * @throws SQLException
+   */
+  @throws(classOf[SQLException])
+  def write(outputFileName: String, rs: ResultSet, tableName: String): Int = {
+    init(outputFileName)
+    try {
+      initWrite()
+      writeResultSet(rs, tableName)
+    } catch {
+      case e: IOException => throw convertException("IOException writing " + outputFileName, e);
+    }
+  }
+
+  /**
+   * Writes the result set of a query to a file in the CSV format.
+   *
+   * @param conn the connection
+   * @param outputFileName the file name
+   * @param sql the query
+   * @param charset the charset or null to use the system default charset
+   *          (see system property file.encoding)
+   * @return the number of rows written
+   * @throws SQLException
+   */
+  @throws(classOf[SQLException])
+  def write(conn: Connection, outputFileName: String, sql: String, tableName: String): Int = {
+    val stat = conn.createStatement
+    val rs = stat.executeQuery(sql)
+    val nRows = write(outputFileName, rs, tableName)
+    stat.close
+    nRows
+  }
 
   @throws(classOf[SQLException])
-  private def writeResultSet(rs: ResultSet): Int =  {
+  private def writeResultSet(rs: ResultSet, tableName: String): Int =  {
     try {
       val file = new File(fileName)
       val meta = rs.getMetaData
-      val avroSchema = metaToSchema(meta)
+      val avroSchema = metaToSchema(meta, tableName)
       writer.create(avroSchema, file)
 
       val columnCount = meta.getColumnCount
@@ -135,69 +220,6 @@ class Avro private () extends SimpleRowSource {
   }
 
   /**
-   * Writes the result set to a file in the CSV format.
-   *
-   * @param writer the writer
-   * @param rs the result set
-   * @return the number of rows written
-   * @throws SQLException
-   */
-  @throws(classOf[SQLException])
-  def write(writer: DataFileWriter[AnyRef], rs: ResultSet): Int = {
-    this.writer = writer
-    writeResultSet(rs)
-  }
-
-  /**
-   * Writes the result set to a file in the CSV format. The result set is read
-   * using the following loop:
-   *
-   * <pre>
-   * while (rs.next()) {
-   *     writeRow(row);
-   * }
-   * </pre>
-   *
-   * @param outputFileName the name of the csv file
-   * @param rs the result set - the result set must be positioned before the
-   *          first row.
-   * @param charset the charset or null to use the system default charset
-   *          (see system property file.encoding)
-   * @return the number of rows written
-   * @throws SQLException
-   */
-  @throws(classOf[SQLException])
-  def write(outputFileName: String, rs: ResultSet, charset: String): Int = {
-    init(outputFileName, charset)
-    try {
-      initWrite(rs.getMetaData)
-      writeResultSet(rs)
-    } catch {
-      case e: IOException => throw convertException("IOException writing " + outputFileName, e);
-    }
-  }
-
-  /**
-   * Writes the result set of a query to a file in the CSV format.
-   *
-   * @param conn the connection
-   * @param outputFileName the file name
-   * @param sql the query
-   * @param charset the charset or null to use the system default charset
-   *          (see system property file.encoding)
-   * @return the number of rows written
-   * @throws SQLException
-   */
-  @throws(classOf[SQLException])
-  def write(conn: Connection, outputFileName: String, sql: String, charset: String): Int = {
-    val stat = conn.createStatement
-    val rs = stat.executeQuery(sql)
-    val nRows = write(outputFileName, rs, charset)
-    stat.close
-    nRows
-  }
-
-  /**
    * Reads from the CSV file and returns a result set. The rows in the result
    * set are created on demand, that means the file is kept open until all
    * rows are read or the result set is closed.
@@ -217,30 +239,13 @@ class Avro private () extends SimpleRowSource {
    * @throws SQLException
    */
   @throws(classOf[SQLException])
-  def read(inputFileName: String, colNames: Array[String], charset: String): ResultSet = {
-    init(inputFileName, charset)
+  def read(inputFileName: String, colNames: Array[String]): ResultSet = {
+    init(inputFileName)
     try {
       readResultSet(colNames)
     } catch {
       case e: IOException => throw convertException("IOException reading " + inputFileName, e)
     }
-  }
-
-  /**
-   * Reads CSV data from a reader and returns a result set. The rows in the
-   * result set are created on demand, that means the reader is kept open
-   * until all rows are read or the result set is closed.
-   *
-   * @param reader the reader
-   * @param colNames or null if the column names should be read from the CSV file
-   * @return the result set
-   * @throws SQLException, IOException
-   */
-  @throws(classOf[IOException])
-  def read(reader: DataFileReader[AnyRef], colNames: Array[String]): ResultSet = {
-    init(null, null)
-    this.reader = reader
-    readResultSet(colNames)
   }
 
   @throws(classOf[IOException])
@@ -252,7 +257,7 @@ class Avro private () extends SimpleRowSource {
     for (columnName <- columnNames) {
       import Schema.Type
       val column = schemaFields.get(columnName) match {
-        case Some(schemaField) => Avro.schemFieldToColumn(schemaField)
+        case Some(schemaField) => Avro.schemaFieldToColumn(schemaField)
         case _ => Column(columnName, Types.VARCHAR, Integer.MAX_VALUE, 0) // todo
       }
       result.addColumn(column)
@@ -260,12 +265,12 @@ class Avro private () extends SimpleRowSource {
     result
   }
 
-  private def init(newFileName: String, charset: String) {
+  private def init(newFileName: String) {
     this.fileName = newFileName
   }
 
   @throws(classOf[IOException])
-  private def initWrite(meta: ResultSetMetaData) {
+  private def initWrite() {
     if (writer == null) {
       try {
         writer = new DataFileWriter[AnyRef](AvroDatumWriter[AnyRef]())//.setSyncInterval(syncInterval)

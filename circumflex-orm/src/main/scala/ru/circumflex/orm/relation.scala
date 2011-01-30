@@ -3,18 +3,10 @@ package ru.circumflex.orm
 import ORM._
 import JDBC._
 import java.sql.Statement
-import org.aiotrade.lib.collection.ArrayList
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
 import org.aiotrade.lib.util.config.Config
-import org.apache.avro.file.DataFileReader
-import org.apache.avro.file.DataFileWriter
-import org.apache.avro.{Schema => AvroSchema}
-import java.io.File
 import java.lang.reflect.Method
 import java.sql.PreparedStatement
-import ru.circumflex.orm.avro.Avro
-import ru.circumflex.orm.avro.AvroDatumReader
-import ru.circumflex.orm.avro.AvroDatumWriter
 
 // ## Relations registry
 
@@ -628,82 +620,6 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     } catch {case _ => false}
   }
 
-  lazy val avroSchema: AvroSchema = createAvroSchema
-
-  protected def createAvroSchema: AvroSchema = {
-    init
-
-    val name = recordClass.getSimpleName
-    val space = if (recordClass.getEnclosingClass != null) { // nested class
-      recordClass.getEnclosingClass.getName + "$"
-    } else {
-      Option(recordClass.getPackage) map (_.getName) getOrElse ""
-    }
-    val error = classOf[Throwable].isAssignableFrom(recordClass)
-
-    val schema = AvroSchema.createRecord(name, null, space, error)
-    val avroFields = new java.util.ArrayList[AvroSchema.Field]()
-    for (field <- fields) {
-      val fieldSchema = createAvroFieldSchema(field)
-      val avroField = new AvroSchema.Field(field.name, fieldSchema, null, null)
-      avroFields.add(avroField)
-    }
-    if (error) { // add Throwable message
-      avroFields.add(new AvroSchema.Field("detailMessage", Avro.THROWABLE_MESSAGE, null, null))
-    }
-    schema.setFields(avroFields)
-
-    schema
-  }
-
-  protected def createAvroFieldSchema(field: Field[R, _]): AvroSchema = {
-    val fieldSchema = AvroSchema.create(field.avroType)
-    if (!field.notNull_?) { // nullable
-      Avro.makeNullable(fieldSchema)
-    } else {
-      fieldSchema
-    }
-  }
-
-  def setFieldValue(record: R, name: String, position: Int, value: Any) {
-    _fieldToRecField.keys find (_.name == name) match {
-      case Some(x) => x.setValue(record, value)
-      case None =>
-    }
-  }
-
-  def getFieldValue(record: R, name: String, position: Int): Any = {
-    _fieldToRecField.keys find (_.name == name) match {
-      case Some(x) => x.getValue(record)
-      case None => null
-    }
-  }
-
-  def writeToAvro(records: Seq[R], file: File) {
-//    val writer = new DataFileWriter[R](AvroDatumWriter[R](this))//.setSyncInterval(syncInterval)
-//    writer.create(avroSchema, file)
-//    try {
-//      records foreach writer.append
-//    } finally {
-//      writer.close
-//    }
-  }
-
-  def readFromAvro(file: File): Array[R] = {
-    val records = ArrayList[R]()
-
-//    val reader = new DataFileReader[R](file, AvroDatumReader[R](this))
-//    try {
-//      while (reader.hasNext) {
-//        val record = reader.next(null.asInstanceOf[R])
-//        records += record
-//      }
-//    } finally {
-//      reader.close
-//    }
-
-    records.toArray
-  }
 
   override def equals(that: Any) = that match {
     case r: Relation[R] => r.relationName.equalsIgnoreCase(this.relationName)

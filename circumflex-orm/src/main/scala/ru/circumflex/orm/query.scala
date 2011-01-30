@@ -5,6 +5,7 @@ import JDBC._
 import java.sql.ResultSet
 import java.sql.PreparedStatement
 import collection.mutable.ListBuffer
+import ru.circumflex.orm.avro.Avro
 import ru.circumflex.orm.avro.AvroNode
 
 // ## Query Commons
@@ -178,6 +179,23 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
     else throw new ORMException("Unique result expected, but multiple rows found.")
   }
 
+  def toAvro(fileName: String) {
+    projections foreach resetFieldProjectionAlias
+    resultSet{rs =>
+      Avro().write(fileName, rs, "anonymous")
+    }
+  }
+
+  /**
+   * Reset field alias to field name
+   */
+  protected def resetFieldProjectionAlias(projection: Projection[_]) {
+    projection match {
+      case x: FieldProjection[_, _] => x.AS(x.field.name)
+      case x: CompositeProjection[_] => x.subProjections foreach resetFieldProjectionAlias
+      case _ =>
+    }
+  }
 }
 
 // ## Native SQL
@@ -237,14 +255,6 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
     }
   }
 
-  private def resetFieldProjectionAlias(projection: Projection[_]) {
-    projection match {
-      case x: FieldProjection[_, _] => x.AS(x.field.name)
-      case x: CompositeProjection[_] => x.subProjections foreach resetFieldProjectionAlias
-      case _ =>
-    }
-  }
-
   def from = _relationNodes
   /**
    * Applies specified `nodes` as this query's `FROM` clause.
@@ -298,7 +308,7 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
     this
   }
 
-  protected def addGroupByProjection(proj: Projection[_]): Unit =
+  protected def addGroupByProjection(proj: Projection[_]) {
     findProjection(projection, p => p.equals(proj)) match {
       case None =>
         ensureProjectionAlias(proj)
@@ -306,14 +316,12 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
         this._groupBy ++= List(proj)
       case Some(p) => this._groupBy ++= List(p)
     }
+  }
 
   /**
    * Search deeply for a projection that matches specified `predicate` function.
    */
-  protected def findProjection(
-    projection: Projection[_],
-    predicate: Projection[_] => Boolean
-  ): Option[Projection[_]] = {
+  protected def findProjection(projection: Projection[_], predicate: Projection[_] => Boolean): Option[Projection[_]] = {
     if (predicate(projection)) Some(projection)
     else projection match {
       case p: CompositeProjection[_] => p.subProjections.find(predicate)

@@ -11,6 +11,6 @@ import ru.circumflex.orm.RelationNode
 class AvroNode[R](val relation: Relation[R], fileName: String) extends RelationNode[R] {
 
   def fromAvro(): ResultSet = {
-    Avro().read(fileName, null, null)
+    Avro().read(fileName, null)
   }
 }

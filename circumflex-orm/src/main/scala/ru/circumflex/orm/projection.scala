@@ -145,12 +145,10 @@ class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection
         p.read(rs) match {
           case id: Long =>
             // Has this record been cached? if true, should use and update it via rs instead of creae a new instance
-            val record: R = node.relation.recordOf(id) match {
-              case Some(x) => x
-              case None =>
-                val x = node.relation.recordClass.newInstance
-                node.relation.updateCache(id, x)
-                x
+            val record = node.relation.recordOf(id) getOrElse {
+              val x = node.relation.recordClass.newInstance
+              node.relation.updateCache(id, x)
+              x
             }
             readRecord(rs, record)
           case x => throw new Exception("Error in read id of " + node.relation.recordClass.getSimpleName + ", which alias is '" + p.alias + "', value read is " + x)

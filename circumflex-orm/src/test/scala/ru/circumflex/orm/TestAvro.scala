@@ -26,7 +26,7 @@ object TestAvro {
     rs.addColumn("BIRTH", Types.BIGINT, 255, 0)
     rs.addRow("Caoyuan Deng", "caoyuan.deng@abc.abc", "+86123456789", 30, 10000L)
     rs.addRow("Guibin Zhang", "guibin.zhang@abc.abc", "+86976543210")
-    Avro().write(USER_HOME + "/tmp/test.avro", rs, null)
+    Avro().write(USER_HOME + "/tmp/test.avro", rs, "test")
   }
 
   /**
@@ -34,7 +34,7 @@ object TestAvro {
    */
   @throws(classOf[SQLException])
   def read() {
-    val rs = Avro().read(USER_HOME + "/tmp/test.avro", null, null)
+    val rs = Avro().read(USER_HOME + "/tmp/test.avro", null)
     val meta = rs.getMetaData
     while (rs.next) {
       for (i <- 0 until meta.getColumnCount) {
