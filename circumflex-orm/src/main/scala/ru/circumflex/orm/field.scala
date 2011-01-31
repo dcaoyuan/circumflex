@@ -118,12 +118,6 @@ trait AutoIncrementable[R, T] extends Field[R, T] {
   }
 }
 
-class AutoPrimaryKeyField[R](relation: Relation[R]
-) extends LongField(relation, "id") {
-  _autoIncrement = true
-  override def defaultExpression = Some(ORM.dialect.defaultExpression(this))
-}
-
 abstract class XmlSerializableField[R, T](relation: Relation[R], name: String, sqlType: String, avroType: AvroSchema.Type
 ) extends Field[R, T](relation, name, sqlType, avroType) with XmlSerializable[T] {
   def toXml(value: T) = value.toString
@@ -198,6 +192,40 @@ class XmlField[R](relation: Relation[R], name: String
 ) extends XmlSerializableField[R, NodeSeq](relation, name, ORM.dialect.xmlType, AvroSchema.Type.STRING) {
   def fromXml(str: String): NodeSeq = try XML.loadString(str) catch {case _ => null}
   override def read(rs: ResultSet, alias: String) = Option(fromXml(rs.getString(alias)))
+}
+
+class AutoPrimaryKeyField[R](relation: Relation[R]
+) extends LongField(relation, "id") {
+  _autoIncrement = true
+
+  override def defaultExpression = Some(ORM.dialect.defaultExpression(this))
+
+  /**
+   * @Note:
+   *
+   scala> val s: Long = null.asInstanceOf[Long]
+   s: Long = 0
+
+   scala> s == null
+   <console>:7: warning: comparing values of types Long and Null using `==' will always yield false
+   s == null
+   ^
+   res2: Boolean = false
+   */
+  override def empty_?(record: R): Boolean = getValue(record) == -1
+
+  override def getValue(from: R): Long = {
+    _getValue(from) match {
+      case null => relation.idOf(from).getOrElse(-1)
+      case x: Long => x
+    }
+  }
+
+  override def setValue(to: R, value: Any): Option[() => Unit] = {
+    _setValue(to, value)
+    relation.updateCache(value.asInstanceOf[Long], to)
+    None
+  }
 }
 
 /**

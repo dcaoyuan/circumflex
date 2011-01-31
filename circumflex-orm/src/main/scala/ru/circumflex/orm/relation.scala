@@ -340,8 +340,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    */
   protected[orm] def setParams(record: R, st: PreparedStatement, fields: Seq[Field[R, _]]) = {
     var i = 0
-    while (i < fields.size) {
-      ORM.typeConverter.write(st, fields(i).getValue(record), i + 1)
+    for (field <- fields) {
+      ORM.typeConverter.write(st, field.getValue(record), i + 1)
       i += 1
     }
   }
@@ -364,6 +364,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     val latestIdEq = if (latestId != -1)
       root.alias + "." + PRIMARY_KEY.name + " = " + latestId
     else ORM.dialect.lastIdExpression(root)
+    
     SELECT (root.*) FROM root WHERE (latestIdEq) unique match {
       case Some(r: R) => copyFields(r, record)
       case _ => throw new ORMException("Could not locate the last inserted row.")
@@ -403,7 +404,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       ORM.transactionManager.dml{conn =>
-        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(f => !f.empty_?(record)) else fields
+        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(!_.null_?(record)) else fields
         val sql = ORM.dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
@@ -437,7 +438,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     else {
       if (records.length == 0) return 0
       ORM.transactionManager.dml{conn =>
-        val fs = this.fields.filter(_ != id)
+        val fs = this.fields//.filter(_ != id)
         val sql = ORM.dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
@@ -487,7 +488,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       ORM.transactionManager.dml{conn =>
-        val fs: Seq[Field[R, _]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
+        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields/* .filter(_ != id) */ else fields
         val sql = ORM.dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
@@ -515,7 +516,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     else {
       if (records.length == 0) return 0
       ORM.transactionManager.dml{conn =>
-        val fs: Seq[Field[R, _]] = if (fields.size == 0) this.fields.filter(f => f != id) else fields
+        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields/* .filter(_ != id) */ else fields
         val sql = ORM.dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
