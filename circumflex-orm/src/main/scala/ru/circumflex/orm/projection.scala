@@ -29,7 +29,7 @@ trait AtomicProjection[T] extends Projection[T] {
   /**
    * Projection's alias (`this` is expanded to query-unique alias).
    */
-  private var _alias: String = "this"
+  private var _alias = "this"
 
   def read(rs: ResultSet) = ORM.typeConverter.read(rs, _alias).asInstanceOf[T]
 
@@ -60,13 +60,11 @@ trait CompositeProjection[R] extends Projection[R] {
 
   override def hashCode: Int = {
     if (_hash == 0)
-      for (p <- subProjections)
-        _hash = 31 * _hash + p.hashCode
-    return _hash
+      for (p <- subProjections) _hash = 31 * _hash + p.hashCode
+    _hash
   }
 
   def toSql = subProjections.map(_.toSql).mkString(", ")
-
 }
 
 // ## Expression Projection
@@ -80,8 +78,7 @@ class ExpressionProjection[T](val expression: String) extends AtomicProjection[T
   def toSql = ORM.dialect.alias(expression, alias)
 
   override def equals(obj: Any) = obj match {
-    case p: ExpressionProjection[T] =>
-      p.expression == this.expression
+    case p: ExpressionProjection[T] => p.expression == this.expression
     case _ => false
   }
 
@@ -103,8 +100,7 @@ class FieldProjection[R, T](val node: RelationNode[R], val field: Field[R, T]) e
   def toSql = ORM.dialect.alias(expr, alias)
 
   override def equals(obj: Any) = obj match {
-    case p: FieldProjection[R, T] =>
-      p.node == this.node && p.field.name == this.field.name
+    case p: FieldProjection[R, T] => p.node == this.node && p.field.name == this.field.name
     case _ => false
   }
 
@@ -117,13 +113,10 @@ class FieldProjection[R, T](val node: RelationNode[R], val field: Field[R, T]) e
  * A projection for reading entire `Record`.
  */
 class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection[R] {
-  private type FP = FieldProjection[R, Any]
+  private type FP = FieldProjection[R, _]
 
-//  protected val _fieldProjections: Seq[FP] =
-//    node.relation.fields.map(f => new FieldProjection(node, f.asInstanceOf[Field[Any]]))
-
-  val (pkProjection, otherProjections) = ((None: Option[FP], Nil: List[FP]) /: node.relation.fields) {(acc, f) =>
-    val p = new FieldProjection(node, f.asInstanceOf[Field[R, Any]])
+  private val (pkProjection, otherProjections) = ((None: Option[FP], Nil: List[FP]) /: node.relation.fields) {(acc, f) =>
+    val p = new FieldProjection(node, f)
     if (f == node.relation.PRIMARY_KEY)
       (Some(p), acc._2)
     else
@@ -134,9 +127,6 @@ class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection
     case Some(p) => p :: otherProjections
     case None => otherProjections
   }
-
-  // We will return this `null`s in any failure conditions.
-  protected def nope: R = null.asInstanceOf[R]
 
   def read(rs: ResultSet): R = {
     pkProjection match {
@@ -150,9 +140,9 @@ class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection
               x
             }
             readRecord(rs, record)
-          case x => throw new Exception("Error in read id of " + node.relation.recordClass.getSimpleName + ", which alias is '" + p.alias + "', value read is " + x)
+          case x => throw new Exception("Error in read primary key of " + node.relation.recordClass.getSimpleName + ", which alias is '" + p.alias + "', value read is " + x)
         }
-      case None => nope
+      case None => null.asInstanceOf[R]
     }
   }
 
@@ -165,7 +155,7 @@ class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection
       }
     }
     // If record remains unidentified, do not return it.
-    if (node.relation.transient_?(record)) nope else record
+    if (node.relation.transient_?(record)) null.asInstanceOf[R] else record
   }
 
   override def equals(obj: Any) = obj match {
