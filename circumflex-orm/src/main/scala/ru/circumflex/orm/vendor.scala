@@ -79,6 +79,9 @@ class H2Dialect extends Dialect {
   override def floatType (precision: Int = -1, scale: Int = 0) = "REAL"
   override def doubleType(precision: Int = -1, scale: Int = 0) = "DOUBLE"
 
+  // do nothing -- for H2 you don't need to create manually a sequence for auto-incrementable fields
+  override def initializeField(field: Field[_, _]) {}
+
   override def defaultExpression(field: Field[_, _]): String = field match {
     case a: AutoIncrementable[_, _] if a.autoIncrement_? => " AUTO_INCREMENT"
     case _ => field.defaultExpression.map(" DEFAULT " + _).getOrElse("")
@@ -88,7 +91,6 @@ class H2Dialect extends Dialect {
     "CREATE " + (if (idx.unique_?) "UNIQUE " else "") +
     "INDEX " + idx.name + " ON " + idx.relation.qualifiedName + " (" + idx.expression + ")"
   }
-  override protected def sequenceName(field: Field[_, _]) = quoteIdentifer(field.relation.relationName + "_" + field.name + "_seq")
   override def supportsDropConstraints_? = false
   override def dropSchema(schema: Schema) = "DROP SCHEMA IF EXISTS " + schema.name
   override def dropIndex(idx: Index[_]) = "DROP INDEX IF EXISTS " + idx.name
