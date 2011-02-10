@@ -105,7 +105,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   /**
    * Primary key field of this relation.
    */
-  def PRIMARY_KEY: Field[R, _] = id
+  def PRIMARY_KEY(): Field[R, _] = id
 
   /**
    * Inspect `recordClass` to find fields and constraints definitions.
@@ -432,16 +432,17 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   }
   def INSERT(record: R, fields: Field[R, _]*) = insert(record, fields: _*)
 
-  def insertBatch_!(records: Array[R]): Int = {
+  def insertBatch_!(records: Array[R], isAutoId: Boolean = true): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       if (records.length == 0) return 0
       ORM.transactionManager.dml{conn =>
-        val fs = this.fields//.filter(_ != id)
+        val fs = if (isAutoId) this.fields.filter(_ != PRIMARY_KEY) else this.fields
         val sql = ORM.dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
-        auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
+        val stmt = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
+        auto(stmt){st =>
           var i = 0
           while (i < records.length) {
             setParams(records(i), st, fs)
@@ -449,23 +450,34 @@ abstract class Relation[R](implicit m: Manifest[R]) {
             i += 1
           }
 
-          val rows = st.executeBatch
-          val keys = st.getGeneratedKeys
           var count = 0
-          // RETURN_GENERATED_KEYS returns only one id (the first or the last)
-          var keyId = if (keys.next) keys.getLong(1) else -1
-          val idIsOfTheLastRecord = ORM.dialect.returnGeneratedKeysIsTheLast
-          var j = if (idIsOfTheLastRecord) rows.length - 1 else 0
-          while (j >= 0 && j < rows.length) {
-            if (rows(j) > 0) {
-              count += 1
-              if (keyId > 0) {
-                // refresh id for this record
-                updateCache(keyId, records(j))
-                if (idIsOfTheLastRecord) keyId -= 1 else keyId += 1
+          val rows = st.executeBatch
+          if (isAutoId) {
+            val keys = st.getGeneratedKeys
+            // RETURN_GENERATED_KEYS returns only one id (the first or the last)
+            var key = if (keys.next) keys.getLong(1) else -1
+            val idIsOfTheLastRecord = ORM.dialect.returnGeneratedKeysIsTheLast
+            var j = if (idIsOfTheLastRecord) rows.length - 1 else 0
+            while (j >= 0 && j < rows.length) {
+              if (rows(j) > 0) {
+                count += 1
+                if (key > 0) {
+                  // refresh id for this record
+                  updateCache(key, records(j))
+                  if (idIsOfTheLastRecord) key -= 1 else key += 1
+                }
               }
+              if (idIsOfTheLastRecord) j -= 1 else j += 1
             }
-            if (idIsOfTheLastRecord) j -= 1 else j += 1
+          } else {
+            // if insert with assgined PKs, these PKs should has been put in cache.
+            var j = 0
+            while (j < rows.length) {
+              if (rows(j) > 0) {
+                count += 1
+              }
+              j += 1
+            }
           }
           count
         }
@@ -473,9 +485,9 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     }
   }
 
-  def insertBatch(records: Array[R]): Int = {
+  def insertBatch(records: Array[R], isAutoId: Boolean = true): Int = {
     validate(records)
-    insertBatch_!(records)
+    insertBatch_!(records, isAutoId)
   }
 
   /**
@@ -488,7 +500,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       ORM.transactionManager.dml{conn =>
-        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields/* .filter(_ != id) */ else fields
+        // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
+        val fs = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
@@ -516,7 +529,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     else {
       if (records.length == 0) return 0
       ORM.transactionManager.dml{conn =>
-        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields/* .filter(_ != id) */ else fields
+        // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
+        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
         sqlLog.debug(sql)
         auto(conn.prepareStatement(sql)){st =>
