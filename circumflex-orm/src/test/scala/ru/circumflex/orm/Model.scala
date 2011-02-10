@@ -40,6 +40,7 @@ object Model {
     Countries.save(country)
 
     println(Countries.idOf(country) + " " + country)
+    COMMIT
   }
 
   def selects = {
