@@ -29,10 +29,11 @@ object Model {
     Countries.save(country)
     println(Countries.idOf(country) + " " + country)
 
-    val city = new City(country, "mossco")
+    val city = new City(country, "Moscow")
     Cities.save(city)
-    Cities.save(new City(country, "abc"))
-    Cities.save(new City(country, "efg"))
+    val city2 = new City(country, "海参崴")
+    Cities.save(city2)
+    Cities.save(new City(country, "Petersburg"))
 
     val capital = new Capital(country, city)
     Capitals.save(capital)
