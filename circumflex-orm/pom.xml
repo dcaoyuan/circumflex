@@ -7,15 +7,28 @@
     <groupId>ru.circumflex</groupId>
     <artifactId>circumflex-orm</artifactId>
     <packaging>jar</packaging>
-    <version>1.2</version>
+    <version>1.2.1</version>
     <name>Circumflex ORM Framework</name>
 
     <parent>
         <groupId>org.aiotrade</groupId>
         <artifactId>libs</artifactId>
         <version>1.0-SNAPSHOT</version>
-        <relativePath>../aiotrade/libs/pom.xml</relativePath>
+        <relativePath>../../aiotrade/libs/pom.xml</relativePath>
     </parent>
+
+    <properties>
+        <deploy.version>releases</deploy.version>
+    </properties>
+
+    <distributionManagement>
+        <repository>
+            <id>repo.qa</id>
+            <name>Nyapc ${deploy.version} repository</name>
+            <url>http://repo.qa/content/repositories/${deploy.version}</url>
+        </repository>
+    </distributionManagement>
+
 
     <dependencies>
         <dependency>
