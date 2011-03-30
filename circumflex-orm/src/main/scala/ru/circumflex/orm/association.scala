@@ -88,7 +88,7 @@ class Association[R, F](val relation: Relation[R],
       recField match {
         case Some(x) =>
           try {
-            x.getter.invoke(from).asInstanceOf[F] match {
+            x.get(from).asInstanceOf[F] match {
               case null => -1
               case record => foreignRelation.idOf(record).getOrElse(-1)
             }

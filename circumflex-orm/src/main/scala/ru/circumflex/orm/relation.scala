@@ -3,6 +3,7 @@ package ru.circumflex.orm
 import JDBC._
 import java.sql.Statement
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
+import org.aiotrade.lib.util.ClassVar
 import org.aiotrade.lib.util.config.Config
 import java.lang.reflect.Method
 import java.sql.PreparedStatement
@@ -57,11 +58,11 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   val recordClass: Class[R] = Config.loadClass[R](m.erasure.getName)
 
   private val recordSample: R = recordClass.newInstance
-  private val recordFields = ClassUtil.getPublicVariables(recordClass)
+  private val recordFields: List[ClassVar[R, _]] = ClassVar.getPublicVars(recordClass)
 
   private var recordToPk = WeakIdentityBiHashMap[R, Long]()
 
-  protected var _fieldToRecField: Map[Field[R, _], ClassVariable[R, _]] = Map()
+  protected var _fieldToRecField: Map[Field[R, _], ClassVar[R, _]] = Map()
   protected var _fields: Seq[Field[R, _]] = Nil
   protected var _associations: Seq[Association[R, _]] = Nil
   protected var _constraints: Seq[Constraint[R]] = Nil
@@ -110,9 +111,9 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   /**
    * Inspect `recordClass` to find fields and constraints definitions.
    */
-  def recFieldOf(field: Field[R, _]): Option[ClassVariable[R, _]] = {
+  def recFieldOf[T](field: Field[R, T]): Option[ClassVar[R, T]] = {
     init
-    _fieldToRecField.get(field)
+    _fieldToRecField.get(field).asInstanceOf[Option[ClassVar[R, T]]]
   }
 
   def fields: Seq[Field[R, _]] = {
@@ -372,7 +373,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   }
 
   protected[orm] def copyFields(from: R, to: R): Unit =
-    recordFields foreach {_.copyField(from, to)}
+    recordFields foreach {_.copy(from, to)}
 
   // ### Validate, Insert, Update, Save and Delete
 

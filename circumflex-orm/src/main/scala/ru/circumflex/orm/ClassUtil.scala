@@ -1,39 +1,9 @@
 package ru.circumflex.orm
 
 import java.lang.reflect.Method
-import java.lang.reflect.Modifier
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.ArrayList
-
-/**
- * R: Type of record class
- * T: Type of class's variable
- */
-final case class ClassVariable[R, T](name: String, getter: Method, setter: Method) {
-  if (getter != null) getter.setAccessible(true)
-  if (setter != null) setter.setAccessible(true)
-
-  def getValue(from: R): T = {
-    try {
-      getter.invoke(from).asInstanceOf[T]
-    } catch {
-      case e: Exception => throw new RuntimeException(e)
-    }
-  }
-
-  def setValue(to: R, value: T) {
-    try {
-      setter.invoke(to, value.asInstanceOf[AnyRef]) // @todo, T is any
-    } catch {
-      case e: Exception => throw new RuntimeException(e)
-    }
-  }
-
-  def copyField(from: R, to: R) {
-    setValue(to, getValue(from))
-  }
-}
 
 object ClassUtil {
   
@@ -184,24 +154,6 @@ object ClassUtil {
     }
   }
 
-  def getPublicVariables[R](clz: Class[R]): List[ClassVariable[R, _]] = {
-    var fields: List[ClassVariable[R, _]] = Nil
-    val methods = clz.getMethods
-    for (method <- methods; if Modifier.isPublic(method.getModifiers)) {
-      val name = method.getName
-      val params = method.getParameterTypes
-      if (name.endsWith("_$eq") && params.length == 1) {
-        val getterName = name.substring(0, name.length - 4)
-        val paramType = params(0)
-        methods find (x => x.getName == getterName && x.getReturnType == paramType) match {
-          case Some(getter) => fields ::= ClassVariable(getterName, getter, method)
-          case _ =>
-        }
-      }
-    }
-    fields
-  }
-
   def convert(a: AnyRef, targetType: Class[_]): AnyRef = {
     if (a == null)
       return null
@@ -228,9 +180,7 @@ object ClassUtil {
       }
     }
 
-    throw new RuntimeException("Can not convert the value " + a +
-                               " from " + currentType + " to " + targetType)
+    throw new RuntimeException("Can not convert the value " + a + " from " + currentType + " to " + targetType)
   }
-
 
 }

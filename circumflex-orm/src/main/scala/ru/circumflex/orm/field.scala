@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream
 import java.nio.ByteBuffer
 import java.sql.ResultSet
 import java.util.Date
+import org.aiotrade.lib.util.ClassVar
 import org.apache.avro.{Schema => AvroSchema}
 import scala.xml.NodeSeq
 import scala.xml.XML
@@ -43,7 +44,7 @@ class Field[R, T](val relation: Relation[R],
   // An optional default expression for DDL.
   protected var _defaultExpression: Option[String] = None
 
-  protected lazy val recField: Option[ClassVariable[R, _]] = relation.recFieldOf(this)
+  protected lazy val recField: Option[ClassVar[R, T]] = relation.recFieldOf(this)
 
   def unique_?() = _unique
   def UNIQUE(): this.type = {
@@ -86,7 +87,7 @@ class Field[R, T](val relation: Relation[R],
     recField match {
       case Some(x) =>
         try {
-          x.getter.invoke(from)
+          x.get(from)
         } catch {
           case e: Exception => throw new RuntimeException(e)
         }
@@ -98,7 +99,7 @@ class Field[R, T](val relation: Relation[R],
     recField match {
       case Some(x) =>
         try {
-          x.setter.invoke(to, value.asInstanceOf[AnyRef])
+          x.set(to, value.asInstanceOf[T])
         } catch {
           case e: Exception => throw new RuntimeException(e)
         }
