@@ -83,6 +83,7 @@ object ORM {
   }
   def lastAlias(alias: String): Unit = _lastAlias.set(alias)
 
+  val avroDir = config.getString("orm.avro.dir", ".")
 }
 
 // ### Connection provider

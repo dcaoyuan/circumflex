@@ -159,5 +159,5 @@ package object orm {
 
   // functions
   
-  def AVRO[R](relation: Relation[R], fileName: String) = new AvroNode[R](relation, fileName)
+  def AVRO[R](relation: Relation[R], fileName: String = null) = AvroNode[R](relation, fileName)
 }
