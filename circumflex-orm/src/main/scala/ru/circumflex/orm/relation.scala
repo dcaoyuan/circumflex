@@ -230,6 +230,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
 
   private def findMembers(cl: Class[_]) {
     ClassUtil.getValDefs(cl) foreach processMember
+    _fields = _fields.reverse
   }
 
   private def processMember(getter: Method) {
