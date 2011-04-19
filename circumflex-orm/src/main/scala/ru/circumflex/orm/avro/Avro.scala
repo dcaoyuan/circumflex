@@ -56,7 +56,7 @@ object Avro {
       case Types.BOOLEAN => Type.BOOLEAN
       case Types.VARBINARY => Type.BYTES
       case Types.DOUBLE | Types.DECIMAL => Type.DOUBLE
-      case Types.FLOAT => Type.FLOAT
+      case Types.FLOAT | Types.REAL => Type.FLOAT
       case Types.INTEGER => Type.INT
       case Types.BIGINT => Type.LONG
       case Types.VARCHAR => Type.STRING
