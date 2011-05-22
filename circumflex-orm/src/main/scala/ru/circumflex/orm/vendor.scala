@@ -28,6 +28,23 @@ class MySQLDialect extends Dialect {
   override def sequenceNextValQuery[T](node: RelationNode[T]): SQLQuery[T] =
     throw new UnsupportedOperationException("This operation is unsupported in the MySQL dialect.")
 
+  override def createIndex(idx: Index[_]): String = {
+    var result = "CREATE "
+    if (idx.unique_?) result += "UNIQUE "
+    result += "INDEX " + idx.name + " USING " + idx.using +
+    " ON " + idx.relation.qualifiedName + " (" + idx.expression + ")"
+    if (idx.where != EmptyPredicate)
+      log.warning("Ignoring WHERE clause of INDEX " + idx.name +
+                  ": predicates are not supported.")
+    return result
+  }  
+  
+  override def delete(dml: Delete[_]): String = {
+    var result = "DELETE " + dml.node.alias + " FROM " + dml.node.toSql
+    if (dml.where != EmptyPredicate) result += " WHERE " + dml.where.toSql
+    return result
+  }
+
   override def lastIdExpression(node: RelationNode[_]) =
     node.alias + "." + node.relation.PRIMARY_KEY.name + " = LAST_INSERT_ID()"
   override def setReferentialIntegrity(enable: Boolean) =
