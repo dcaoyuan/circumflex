@@ -18,15 +18,6 @@ object AvroDatumWriter {
 class AvroDatumWriter[R] private (private var _root: Schema, data: GenericData) extends DatumWriter[R] {
 
   setSchema(_root)
-  //public GenericDatumWriter() { this(GenericData.get()); }
-
-  //protected GenericDatumWriter(GenericData data) { this.data = data; }
-
-
-//  protected GenericDatumWriter(Schema root, GenericData data) {
-//    this(data);
-//    setSchema(root);
-//  }
 
   def setSchema(root: Schema) {
     this._root = root
@@ -109,10 +100,25 @@ class AvroDatumWriter[R] private (private var _root: Schema, data: GenericData) 
     val size = getArraySize(datum)
     out.writeArrayStart()
     out.setItemCount(size)
-    val itr = getArrayElements(datum)
-    while (itr.hasNext) {
-      out.startItem
-      write(element, itr.next, out)
+    datum match {
+      case xs: Array[_] =>
+        var i = -1
+        while ({i += 1; i < xs.length}) {
+          out.startItem
+          write(element, xs(i), out)
+        }
+      case xs: java.util.Collection[_] =>
+        val itr = xs.iterator
+        while (itr.hasNext) {
+          out.startItem
+          write(element, itr.next, out)
+        }
+      case xs: collection.Seq[_] =>
+        val itr = xs.iterator
+        while (itr.hasNext) {
+          out.startItem
+          write(element, itr.next, out)
+        }
     }
     out.writeArrayEnd
   }
@@ -120,13 +126,11 @@ class AvroDatumWriter[R] private (private var _root: Schema, data: GenericData) 
   /** Called by the default implementation of {@link #writeArray} to get the
    * size of an array.  The default implementation is for {@link Collection}.*/
   protected def getArraySize(array: AnyRef): Long = {
-    array.asInstanceOf[java.util.Collection[_]].size
-  }
-
-  /** Called by the default implementation of {@link #writeArray} to enumerate
-   * array elements.  The default implementation is for {@link Collection}.*/
-  protected def getArrayElements(array: AnyRef): java.util.Iterator[_ <: AnyRef] = {
-    array.asInstanceOf[java.util.Collection[AnyRef]].iterator
+    array match {
+      case xs: Array[_] => xs.length
+      case xs: java.util.Collection[_] => xs.size
+      case xs: collection.Seq[_] => xs.size
+    }
   }
 
   /** Called to write a map.  May be overridden for alternate map
@@ -137,24 +141,34 @@ class AvroDatumWriter[R] private (private var _root: Schema, data: GenericData) 
     val size = getMapSize(datum)
     out.writeMapStart
     out.setItemCount(size)
-    for (entry <- getMapEntries(datum)) {
-      out.startItem
-      writeString(entry.getKey, out)
-      write(value, entry.getValue, out)
+    datum match {
+      case map: java.util.Map[AnyRef, AnyRef] => 
+        val itr = map.entrySet.iterator
+        while (itr.hasNext) {
+          val entry = itr.next
+          out.startItem
+          writeString(entry.getKey, out)
+          write(value, entry.getValue, out)
+        }
+      case map: collection.Map[AnyRef, AnyRef] => map.size
+        val itr = map.iterator
+        while (itr.hasNext) {
+          val entry = itr.next
+          out.startItem
+          writeString(entry._1, out)
+          write(value, entry._2, out)
+        }
     }
     out.writeMapEnd
   }
 
   /** Called by the default implementation of {@link #writeMap} to get the size
    * of a map.  The default implementation is for {@link Map}.*/
-  protected def getMapSize(map: AnyRef): Int = {
-    map.asInstanceOf[java.util.Map[_, _]].size
-  }
-
-  /** Called by the default implementation of {@link #writeMap} to enumerate
-   * map elements.  The default implementation is for {@link Map}.*/
-  protected def getMapEntries(map: AnyRef): java.lang.Iterable[java.util.Map.Entry[AnyRef,AnyRef]] = {
-    map.asInstanceOf[java.util.Map[AnyRef, AnyRef]].entrySet
+  protected def getMapSize(datum: AnyRef): Int = {
+    datum match {
+      case map: java.util.Map[_, _] => map.size
+      case map: collection.Map[_, _] => map.size
+    }
   }
 
   /** Called to write a string.  May be overridden for alternate string

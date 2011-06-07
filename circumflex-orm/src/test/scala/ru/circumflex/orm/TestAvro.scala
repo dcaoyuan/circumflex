@@ -15,7 +15,7 @@ object TestAvro {
     write
     read
   }
-
+  
   @throws(classOf[SQLException])
   def write() {
     val rs = new SimpleResultSet

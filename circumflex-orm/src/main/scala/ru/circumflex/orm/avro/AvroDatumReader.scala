@@ -12,10 +12,12 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.io.DatumReader
 import org.apache.avro.io.Decoder
+import org.apache.avro.io.DecoderFactory
 import org.apache.avro.io.ResolvingDecoder
 import org.apache.avro.util.Utf8
 import org.apache.avro.util.WeakIdentityHashMap
-import scala.collection.JavaConversions._
+//import scala.collection.JavaConversions._
+import scala.collection.mutable
 
 object AvroDatumReader {
   private val RESOLVER_CACHE =
@@ -29,7 +31,10 @@ object AvroDatumReader {
     import Schema.Type._
     schema.getType match {
       case RECORD =>
-        schema.getFields foreach {field => skip(field.schema, in)}
+        val fields = schema.getFields.iterator
+        while (fields.hasNext) {
+          skip(fields.next.schema, in)
+        }
       case ENUM =>
         in.readInt
       case ARRAY =>
@@ -109,14 +114,14 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
       case null =>
         val cache = RESOLVER_CACHE.get.get(actual) match {
           case null =>
-            val cache = new WeakIdentityHashMap[Schema,ResolvingDecoder]()
+            val cache = new WeakIdentityHashMap[Schema, ResolvingDecoder]()
             RESOLVER_CACHE.get().put(actual, cache)
             cache
           case x => x
         }
         val resolver = cache.get(expected) match {
           case null =>
-            val resolver = new ResolvingDecoder(Schema.applyAliases(actual, expected), expected, null)
+            val resolver = DecoderFactory.get.resolvingDecoder(Schema.applyAliases(actual, expected), expected, null)
             cache.put(expected, resolver)
             resolver
           case x => x
@@ -130,7 +135,7 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
   @throws(classOf[IOException])
   def read(reuse: R, in: Decoder): R = {
     val resolver = getResolver(actual, expected)
-    resolver.init(in)
+    resolver.configure(in)
     val result = read(reuse, expected, resolver).asInstanceOf[R]
     resolver.drain
     result
@@ -206,7 +211,7 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
   /** Called to create an enum value. May be overridden for alternate enum
    * representations.  By default, returns a GenericEnumSymbol. */
   protected def createEnum(symbol: String, schema: Schema): AnyRef = {
-    new GenericData.EnumSymbol(symbol)
+    new GenericData.EnumSymbol(schema, symbol)
   }
 
   /** Called to read an array instance.  May be overridden for alternate array
@@ -315,11 +320,17 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
 
   /** Called to create new array instances.  Subclasses may override to use a
    * different array implementation.  By default, this returns a {@link
-   * GenericData.Array}.*/
+   * Array}.*/
   protected def newArray(old: AnyRef, size: Int, schema: Schema): AnyRef = {
-    old match {
-      case x: java.util.Collection[_] => x.clear; old
-      case _ => new GenericData.Array(size, schema)
+    import Schema.Type._
+    schema.getElementType.getType match {
+      case RECORD | ENUM | ARRAY | MAP | UNION  | FIXED | STRING | BYTES | NULL =>  new Array[AnyRef](size)
+      case INT =>     new Array[Int](size)
+      case LONG =>    new Array[Long](size)
+      case FLOAT =>   new Array[Float](size)
+      case DOUBLE =>  new Array[Double](size)
+      case BOOLEAN => new Array[Boolean](size)
+      case _ => throw new AvroRuntimeException("Unknown type: " + expected)
     }
   }
 
@@ -328,8 +339,8 @@ class AvroDatumReader[R](private var actual: Schema, private var expected: Schem
    * HashMap}.*/
   protected def newMap(old: AnyRef, size: Int): AnyRef = {
     old match {
-      case x: java.util.Map[_, _] => x.clear; old
-      case _ => new java.util.HashMap[AnyRef, AnyRef](size)
+      case x: mutable.HashMap[_, _] => x.clear; old
+      case _ => new mutable.HashMap[AnyRef, AnyRef]
     }
   }
 
