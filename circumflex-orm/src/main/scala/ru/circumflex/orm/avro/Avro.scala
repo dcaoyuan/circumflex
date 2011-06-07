@@ -10,6 +10,8 @@ import java.sql.SQLException
 import java.sql.Types
 import java.util.ArrayList
 
+import org.aiotrade.lib.avro.AvroDatumReader
+import org.aiotrade.lib.avro.AvroDatumWriter
 import org.apache.avro.Schema
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.file.DataFileWriter
