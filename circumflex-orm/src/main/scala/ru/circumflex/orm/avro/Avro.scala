@@ -10,8 +10,8 @@ import java.sql.SQLException
 import java.sql.Types
 import java.util.ArrayList
 
-import org.aiotrade.lib.avro.AvroDatumReader
-import org.aiotrade.lib.avro.AvroDatumWriter
+import org.aiotrade.lib.avro.ReflectDatumReader
+import org.aiotrade.lib.avro.ReflectDatumWriter
 import org.apache.avro.Schema
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.file.DataFileWriter
@@ -275,7 +275,7 @@ class Avro private () extends SimpleRowSource {
   private def initWrite() {
     if (writer == null) {
       try {
-        writer = new DataFileWriter[AnyRef](AvroDatumWriter[AnyRef]())//.setSyncInterval(syncInterval)
+        writer = new DataFileWriter[AnyRef](ReflectDatumWriter[AnyRef]())//.setSyncInterval(syncInterval)
       } catch {
         case e: Exception => close; throw DbException.convertToIOException(e)
       }
@@ -292,7 +292,7 @@ class Avro private () extends SimpleRowSource {
   private def initRead() {
     if (reader == null) {
       try {
-        reader = new DataFileReader[AnyRef](new File(fileName), AvroDatumReader[AnyRef]())
+        reader = new DataFileReader[AnyRef](new File(fileName), ReflectDatumReader[AnyRef]())
         readSchemaFields
       } catch {
         case e: IOException => close; throw e
