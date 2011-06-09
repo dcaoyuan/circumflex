@@ -89,7 +89,10 @@ class Field[R, T](val relation: Relation[R],
         try {
           x.get(from)
         } catch {
-          case e: Exception => throw new RuntimeException(e)
+          case e: Exception => 
+            val ex = new RuntimeException("Error of getter " + x.getter + ": " + e.getMessage)
+            ex.initCause(Option(e.getCause) getOrElse e)
+            throw ex
         }
       case None => null
     }
@@ -101,7 +104,10 @@ class Field[R, T](val relation: Relation[R],
         try {
           x.set(to, value.asInstanceOf[T])
         } catch {
-          case e: Exception => throw new RuntimeException(e)
+          case e: Exception => 
+            val ex = new RuntimeException("Error of setter, requires " + x.setter.getParameterTypes + ", given is " + value + ": "+ e.getMessage)
+            ex.initCause(Option(e.getCause) getOrElse e)
+            throw ex
         }
       case None =>
     }

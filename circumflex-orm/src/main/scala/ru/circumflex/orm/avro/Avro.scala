@@ -10,13 +10,14 @@ import java.sql.SQLException
 import java.sql.Types
 import java.util.ArrayList
 
-import org.aiotrade.lib.avro.ReflectDatumReader
-import org.aiotrade.lib.avro.ReflectDatumWriter
 import org.apache.avro.Schema
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.file.DataFileWriter
 import org.apache.avro.generic.GenericData
+import org.apache.avro.generic.GenericDatumReader
+import org.apache.avro.generic.GenericDatumWriter
 import org.apache.avro.generic.GenericRecord
+import org.apache.avro.util.Utf8
 import ru.circumflex.orm.Field
 import ru.circumflex.orm.Relation
 import ru.circumflex.orm.sql.DbException
@@ -28,40 +29,61 @@ import ru.circumflex.orm.sql.SimpleRowSource
 
 /**
  * A facility to read from and write to AVRO files
+ * 
+ * org.apache.avro.generic.GenericDatumReader/Writer is enough for our case here.
  *
  * @author Caoyuan Deng
  */
 object Avro {
-  val THROWABLE_MESSAGE = makeNullable(Schema.create(Schema.Type.STRING))
-
+  private val nullableUnionSchemasCache = {
+    val xs = new java.util.ArrayList[Schema](2)
+    xs.add(null) // to be set
+    xs.add(Schema.create(Schema.Type.NULL))
+    xs
+  }
+  
+  // should be declared after nullableUnionSchemasCache to get calling on makeNullable don't throws NPE
+  private val THROWABLE_MESSAGE = makeNullable(Schema.create(Schema.Type.STRING))
+  
   def makeNullable(schema: Schema): Schema = {
-    Schema.createUnion(java.util.Arrays.asList(Schema.create(Schema.Type.NULL), schema))
+    nullableUnionSchemasCache.set(0, schema)
+    Schema.createUnion(nullableUnionSchemasCache)
   }
 
   def schemaFieldToColumn(field: Schema.Field): Column = {
     import Schema.Type
+    val sqlType = schemaTypeToSqlType(field.schema)
     field.schema.getType match {
-      case Type.BOOLEAN => Column(field.name, Types.BOOLEAN,   Integer.MAX_VALUE, 0)
-      case Type.BYTES =>   Column(field.name, Types.VARBINARY, Integer.MAX_VALUE, 0)
-      case Type.DOUBLE =>  Column(field.name, Types.DOUBLE,    Integer.MAX_VALUE, 0)
-      case Type.FIXED =>   Column(field.name, Types.VARBINARY, field.schema.getFixedSize, 0)
-      case Type.FLOAT =>   Column(field.name, Types.FLOAT,     Integer.MAX_VALUE, 0)
-      case Type.INT =>     Column(field.name, Types.INTEGER,   Integer.MAX_VALUE, 0)
-      case Type.LONG =>    Column(field.name, Types.BIGINT,    Integer.MAX_VALUE, 0)
-      case Type.STRING =>  Column(field.name, Types.VARCHAR,   Integer.MAX_VALUE, 0)
+      case Type.FIXED => Column(field.name, sqlType, field.schema.getFixedSize, 0)
+      case _ => Column(field.name, sqlType, Integer.MAX_VALUE, 0)
+    }
+  }
+  
+  private def schemaTypeToSqlType(schema: Schema): Int = {
+    import Schema.Type
+    schema.getType match {
+      case Type.UNION => schemaTypeToSqlType(schema.getTypes.get(0)) // @see makeNullable
+      case Type.INT =>     Types.INTEGER
+      case Type.LONG =>    Types.BIGINT
+      case Type.FLOAT =>   Types.FLOAT
+      case Type.DOUBLE =>  Types.DOUBLE
+      case Type.FIXED =>   Types.VARBINARY
+      case Type.BYTES =>   Types.VARBINARY
+      case Type.STRING =>  Types.VARCHAR
+      case Type.BOOLEAN => Types.BOOLEAN
     }
   }
 
   def sqlTypeToSchemaType(sqlType: Int): Schema.Type = {
     import Schema.Type
     sqlType match {
-      case Types.BOOLEAN => Type.BOOLEAN
+      case Types.VARCHAR   => Type.STRING
       case Types.VARBINARY => Type.BYTES
+      case Types.BOOLEAN   => Type.BOOLEAN
+      case Types.INTEGER   => Type.INT
+      case Types.BIGINT    => Type.LONG
+      case Types.FLOAT  | Types.REAL    => Type.FLOAT
       case Types.DOUBLE | Types.DECIMAL => Type.DOUBLE
-      case Types.FLOAT | Types.REAL => Type.FLOAT
-      case Types.INTEGER => Type.INT
-      case Types.BIGINT => Type.LONG
-      case Types.VARCHAR => Type.STRING
     }
   }
 
@@ -70,16 +92,14 @@ object Avro {
 
     val schema = Schema.createRecord(name, null, "", false)
     val avroFields = new java.util.ArrayList[Schema.Field]()
-    var i = 0
-    while (i < columnCount) {
+    var i = -1
+    while ({i += 1; i < columnCount}) {
       val columnName = meta.getColumnLabel(i + 1)
       val columnType = meta.getColumnType(i + 1)
       val schameType = sqlTypeToSchemaType(columnType)
-      val fieldSchema = Schema.create(schameType)
+      val fieldSchema = Avro.makeNullable(Schema.create(schameType)) // column value in ResultSet is object, just make them nullable
       val avroField = new Schema.Field(columnName, fieldSchema, null, null)
       avroFields.add(avroField)
-
-      i += 1
     }
     schema.setFields(avroFields)
     schema
@@ -89,7 +109,7 @@ object Avro {
 
   // --- utilies for reference only
   
-  protected def createAvroSchema(relation: Relation[_]): Schema = {
+  private def createAvroSchema(relation: Relation[_]): Schema = {
     val recordClass = relation.recordClass
     val name = recordClass.getSimpleName
     val space = if (recordClass.getEnclosingClass != null) { // nested class
@@ -114,7 +134,7 @@ object Avro {
     schema
   }
 
-  protected def createAvroFieldSchema(field: Field[_, _]): Schema = {
+  private def createAvroFieldSchema(field: Field[_, _]): Schema = {
     val fieldSchema = Schema.create(field.avroType)
     if (!field.notNull_?) { // nullable
       Avro.makeNullable(fieldSchema)
@@ -275,7 +295,7 @@ class Avro private () extends SimpleRowSource {
   private def initWrite() {
     if (writer == null) {
       try {
-        writer = new DataFileWriter[AnyRef](ReflectDatumWriter[AnyRef]())//.setSyncInterval(syncInterval)
+        writer = new DataFileWriter[AnyRef](new GenericDatumWriter[AnyRef]())//.setSyncInterval(syncInterval)
       } catch {
         case e: Exception => close; throw DbException.convertToIOException(e)
       }
@@ -292,7 +312,7 @@ class Avro private () extends SimpleRowSource {
   private def initRead() {
     if (reader == null) {
       try {
-        reader = new DataFileReader[AnyRef](new File(fileName), ReflectDatumReader[AnyRef]())
+        reader = new DataFileReader[AnyRef](new File(fileName), new GenericDatumReader[AnyRef]())
         readSchemaFields
       } catch {
         case e: IOException => close; throw e
@@ -332,7 +352,10 @@ class Avro private () extends SimpleRowSource {
         var i = 0
         while (i < columnNames.length) {
           val colName = columnNames(i)
-          row(i) = record.get(colName)
+          row(i) = record.get(colName) match {
+            case x: Utf8 => x.toString
+            case x => x
+          }
           i += 1
         }
       } catch {
