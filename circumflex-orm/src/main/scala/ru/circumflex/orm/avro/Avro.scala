@@ -13,9 +13,9 @@ import java.util.ArrayList
 import org.apache.avro.Schema
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.file.DataFileWriter
+import org.apache.avro.reflect.ReflectDatumReader
+import org.apache.avro.reflect.ReflectDatumWriter
 import org.apache.avro.generic.GenericData
-import org.apache.avro.generic.GenericDatumReader
-import org.apache.avro.generic.GenericDatumWriter
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.util.Utf8
 import ru.circumflex.orm.Field
@@ -30,7 +30,8 @@ import ru.circumflex.orm.sql.SimpleRowSource
 /**
  * A facility to read from and write to AVRO files
  * 
- * org.apache.avro.generic.GenericDatumReader/Writer is enough for our case here.
+ * We have to use org.apache.avro.reflect.ReflectDatumReader/Writer, since which 
+ * isByte() accepts Array[Byte]. (The generic one only accepts java.nio.ByteBuffer)
  *
  * @author Caoyuan Deng
  */
@@ -295,7 +296,7 @@ class Avro private () extends SimpleRowSource {
   private def initWrite() {
     if (writer == null) {
       try {
-        writer = new DataFileWriter[AnyRef](new GenericDatumWriter[AnyRef]())//.setSyncInterval(syncInterval)
+        writer = new DataFileWriter[AnyRef](new ReflectDatumWriter[AnyRef]())//.setSyncInterval(syncInterval)
       } catch {
         case e: Exception => close; throw DbException.convertToIOException(e)
       }
@@ -312,7 +313,7 @@ class Avro private () extends SimpleRowSource {
   private def initRead() {
     if (reader == null) {
       try {
-        reader = new DataFileReader[AnyRef](new File(fileName), new GenericDatumReader[AnyRef]())
+        reader = new DataFileReader[AnyRef](new File(fileName), new ReflectDatumReader[AnyRef]())
         readSchemaFields
       } catch {
         case e: IOException => close; throw e
