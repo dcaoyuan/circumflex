@@ -30,7 +30,7 @@ import ru.circumflex.orm.sql.SimpleRowSource
 /**
  * A facility to read from and write to AVRO files
  * 
- * We have to use org.apache.avro.reflect.ReflectDatumReader/Writer, since which 
+ * We have to use org.apache.avro.reflect.ReflectDatumReader/Writer, since whoes 
  * isByte() accepts Array[Byte]. (The generic one only accepts java.nio.ByteBuffer)
  *
  * @author Caoyuan Deng
