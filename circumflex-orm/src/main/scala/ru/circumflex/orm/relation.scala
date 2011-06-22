@@ -409,14 +409,20 @@ abstract class Relation[R](implicit m: Manifest[R]) {
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(!_.null_?(record)) else fields
         val sql = ORM.dialect.insertRecord(this, fs)
         sqlLog.debug(sql)
-        auto(conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)){st =>
+        val isAutoId = !fs.contains(PRIMARY_KEY)
+        val stmt = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
+        auto(stmt){st =>
           setParams(record, st, fs)
+          
           val rows = st.executeUpdate
-          val keys = st.getGeneratedKeys
-          if (rows > 0 && keys.next) {
-            val latestId = keys.getLong(1)
-            // refresh latestId for this record
-            updateCache(latestId, record)
+          // if insert with assgined PK, the PK should has been put in cache.
+          if (isAutoId) {
+            val keys = st.getGeneratedKeys
+            if (rows > 0 && keys.next) {
+              val latestId = keys.getLong(1)
+              // refresh latestId for this record
+              updateCache(latestId, record)
+            }
           }
           rows
         }
