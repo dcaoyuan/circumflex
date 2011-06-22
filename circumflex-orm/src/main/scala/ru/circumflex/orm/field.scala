@@ -224,7 +224,9 @@ class AutoPrimaryKeyField[R](relation: Relation[R]
   override def getValue(from: R): Long = {
     _getValue(from) match {
       case null => relation.idOf(from).getOrElse(-1)
-      case x: Long => x
+      case value: Long => value
+        relation.updateCache(value.asInstanceOf[Long], from)
+        value
     }
   }
 

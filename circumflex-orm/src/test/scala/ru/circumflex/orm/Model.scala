@@ -21,7 +21,7 @@ object Model {
   }
 
   def schema = {
-    new DDLUnit(Cities, Capitals, Countries).dropCreate.messages.foreach(msg => println(msg.body))
+    new DDLUnit(Cities, Capitals, Countries, RecordWithIds).dropCreate.messages.foreach(msg => println(msg.body))
   }
 
   def inserts = {
@@ -41,6 +41,15 @@ object Model {
     Countries.save(country)
 
     println(Countries.idOf(country) + " " + country)
+    
+    val recordWithId = new RecordWithId
+    recordWithId.id = 100
+    recordWithId.name = "a record"
+    RecordWithIds.save(recordWithId)
+    println("id from Cache: " + RecordWithIds.idOf(recordWithId))
+    println("id of record field: " + recordWithId.id)
+    println(RecordWithIds.idOf(recordWithId).get == recordWithId.id)
+    
     COMMIT
   }
 
@@ -89,21 +98,7 @@ object Model {
   }
 }
 
-// ----- Tables
-
-object Countries extends Table[Country] {
-  val code = "code" VARCHAR(2) DEFAULT("'ch'")
-  val name = "name" TEXT
-  val capital = "capital_id".BIGINT REFERENCES(Capitals)
-
-  // Inverse associations, should be def or lazy val
-  def cities = inverse(Cities.country)
-
-  val codeIdx = "country_code_idx" INDEX("code") //USING "btree" UNIQUE
-  //val codeIdx = "country_code_idx" INDEX("LOWER(code)") USING "btree" UNIQUE
-
-  //validation.notEmpty(code).notEmpty(name).pattern(code, "(?i:[a-z]{2})")
-}
+// ----- Model and Tables
 
 class Country {
   // Constructor shortcuts
@@ -122,14 +117,18 @@ class Country {
   override def toString = "Country(name=" + name + ", code=" + code + ")"
 }
 
-object Cities extends Table[City] {
-  // Fields
+object Countries extends Table[Country] {
+  val code = "code" VARCHAR(2) DEFAULT("'ch'")
   val name = "name" TEXT
-  // Associations
-  val country = "country_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE ON_UPDATE CASCADE
-  val serialized = "serialized" SERIALIZED(classOf[Array[Double]], 100)
+  val capital = "capital_id".BIGINT REFERENCES(Capitals)
 
-  //validation.notEmpty(name).notNull(country.field)
+  // Inverse associations, should be def or lazy val
+  def cities = inverse(Cities.country)
+
+  val codeIdx = "country_code_idx" INDEX("code") //USING "btree" UNIQUE
+  //val codeIdx = "country_code_idx" INDEX("LOWER(code)") USING "btree" UNIQUE
+
+  //validation.notEmpty(code).notEmpty(name).pattern(code, "(?i:[a-z]{2})")
 }
 
 class City {
@@ -145,12 +144,14 @@ class City {
   override def toString = "City(name=" + name + " serialized=" + (serialized mkString (",")) + ")"
 }
 
-object Capitals extends Table[Capital] {
+object Cities extends Table[City] {
+  // Fields
+  val name = "name" TEXT
   // Associations
-  val country = "countries_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE
-  val city = "cities_id".BIGINT REFERENCES(Cities) ON_DELETE RESTRICT
-  val countryKey = UNIQUE(country)
-  val cityKey = UNIQUE(city)
+  val country = "country_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE ON_UPDATE CASCADE
+  val serialized = "serialized" SERIALIZED(classOf[Array[Double]], 100)
+
+  //validation.notEmpty(name).notNull(country.field)
 }
 
 class Capital {
@@ -165,5 +166,23 @@ class Capital {
   var city: City = _
 
   override def toString = "Capital(country=" + Option(country).map(_.name) + ", name=" + Option(city).map(_.name) + ")"
+}
+
+object Capitals extends Table[Capital] {
+  // Associations
+  val country = "countries_id".BIGINT REFERENCES(Countries) ON_DELETE CASCADE
+  val city = "cities_id".BIGINT REFERENCES(Cities) ON_DELETE RESTRICT
+  val countryKey = UNIQUE(country)
+  val cityKey = UNIQUE(city)
+}
+
+class RecordWithId {
+  var id: Long = _
+  var name: String = _
+}
+
+object RecordWithIds extends Table[RecordWithId] {
+  override val id = "id" BIGINT()
+  val name = "name" VARCHAR(10)
 }
 
