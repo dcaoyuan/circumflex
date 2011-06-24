@@ -1,6 +1,7 @@
 package ru.circumflex.orm
 
 import java.sql.ResultSet
+import java.util.logging.Logger
 
 // ## Projection Basics
 
@@ -113,6 +114,8 @@ class FieldProjection[R, T](val node: RelationNode[R], val field: Field[R, T]) e
  * A projection for reading entire `Record`.
  */
 class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection[R] {
+  private val log = Logger.getLogger(this.getClass.getName)
+  
   private type FP = FieldProjection[R, _]
 
   private val (pkProjection, otherProjections) = ((None: Option[FP], Nil: List[FP]) /: node.relation.fields) {(acc, f) =>
@@ -121,6 +124,11 @@ class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection
       (Some(p), acc._2)
     else
       (acc._1, p :: acc._2)
+  }
+  
+  private val isAutoPk = pkProjection match {
+    case Some(p) if p.field.isInstanceOf[AutoPrimaryKeyField[R]] => true
+    case _ => false
   }
 
   val subProjections = pkProjection match {
@@ -140,7 +148,11 @@ class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection
               x
             }
             readRecord(rs, record)
-          case x => throw new Exception("Error in read primary key of " + node.relation.recordClass.getSimpleName + ", which alias is '" + p.alias + "', value read is " + x)
+          case x => 
+            // there is case in left join, the joined table has none coresponding record, that is, a null id will be returned by p.read(rs)
+            log.warning("null in read primary key of " + node.relation.recordClass.getSimpleName + ", which alias is '" + p.alias + "', value read is " + x)
+            // @todo, return a null record or throws Exception?
+            null.asInstanceOf[R]
         }
       case None => null.asInstanceOf[R]
     }
@@ -148,7 +160,8 @@ class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection
 
   private def readRecord(rs: ResultSet, record: R): R = {
     query.recordsHolder += record
-    otherProjections foreach {p =>
+    val projections = if (isAutoPk) otherProjections else subProjections
+    projections foreach {p =>
       p.field.setValue(record, p.read(rs).asInstanceOf[AnyRef]) match {
         case Some(lazyAction) => query.lazyFetchers += lazyAction
         case None =>
