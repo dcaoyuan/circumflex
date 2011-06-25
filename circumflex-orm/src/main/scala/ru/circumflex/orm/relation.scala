@@ -434,15 +434,15 @@ abstract class Relation[R](implicit m: Manifest[R]) {
           if (isAutoId) {
             val keys = st.getGeneratedKeys
             if (rows > 0 && keys.next) {
-              val latestId = keys.getLong(1)
-              // refresh latestId for this record
-              updateCache(latestId, record)
+              val key = keys.getLong(1)
+              // refresh key for this record
+              updateCache(key, record)
             }
           } else {
             if (rows > 0) {
               // if insert with assgined PK, refresh using id value of this record
-              val theId = PRIMARY_KEY.getValue(record)
-              updateCache(theId, record)
+              val key = PRIMARY_KEY.getValue(record)
+              updateCache(key, record)
             }
           }
           rows
@@ -499,10 +499,12 @@ abstract class Relation[R](implicit m: Manifest[R]) {
               if (idIsOfTheLastRecord) j -= 1 else j += 1
             }
           } else {
-            // if insert with assgined PKs, these PKs should has been put in cache.
             var j = 0
             while (j < rows.length) {
               if (rows(j) > 0) {
+                val record = records(j)
+                val key = PRIMARY_KEY.getValue(record)
+                updateCache(key, record)
                 count += 1
               }
               j += 1

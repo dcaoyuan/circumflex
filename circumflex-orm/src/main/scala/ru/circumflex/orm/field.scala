@@ -25,6 +25,8 @@ class Field[R, T](val relation: Relation[R],
 ) extends SQLable {
 
   val uuid = relation.uuid + "." + name
+  
+  lazy val isPrimaryKey = relation.PRIMARY_KEY eq this
 
   def read(rs: ResultSet, alias: String): Option[T] = {
     val o = rs.getObject(alias)
