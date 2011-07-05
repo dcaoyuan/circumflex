@@ -1,7 +1,7 @@
 package ru.circumflex.orm
 
 import com.mchange.v2.c3p0.ComboPooledDataSource
-import java.sql.{Timestamp, PreparedStatement, ResultSet, Connection}
+import java.sql.{Timestamp, PreparedStatement, ResultSet, Connection, SQLException}
 import java.util.Date
 import java.util.logging.Logger
 import javax.naming.InitialContext
@@ -183,15 +183,18 @@ object DefaultConnectionProvider extends ConnectionProvider {
         // --- optional config
         ds.setInitialPoolSize(config.getInt("orm.connection.initialPoolSize", 4))
         ds.setMinPoolSize(config.getInt("orm.connection.minPoolSize", 4))
-        ds.setMaxPoolSize(config.getInt("orm.connection.maxPoolSize", 20))
+        ds.setMaxPoolSize(config.getInt("orm.connection.maxPoolSize", 100))
         ds.setAcquireIncrement(config.getInt("orm.connection.acquireIncrement", 4))
 
         ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2 hours
-        ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 1800)) // default 30 mins. After which an idle connection is removed from the pool.
+        ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 3000)) // default 50 mins. After which an idle connection is removed from the pool.
+        
+        // combination of verifying:
         ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 600)) // default 10 mins
         ds.setPreferredTestQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
-        ds.setTestConnectionOnCheckin(config.getBool("orm.connection.testConnectionOnCheckin", false))
-        ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", true))
+        ds.setTestConnectionOnCheckin(config.getBool("orm.connection.testConnectionOnCheckin", true))
+        ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", false))
+        
         ds
       }
   }
@@ -201,6 +204,7 @@ object DefaultConnectionProvider extends ConnectionProvider {
   /**
    * Open a new JDBC connection.
    */
+  @throws(classOf[SQLException])
   def openConnection: Connection = {
     val conn = dataSource.getConnection
     conn.setAutoCommit(false)

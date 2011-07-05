@@ -1,7 +1,8 @@
 package ru.circumflex.orm
 
-import java.sql.{PreparedStatement, Connection}
+import java.sql.{PreparedStatement, Connection, SQLException}
 import collection.mutable.HashMap
+import java.util.logging.Level
 import java.util.logging.Logger
 
 // ## Transaction management
@@ -57,7 +58,7 @@ trait TransactionManager {
   /**
    * Sets a contextual transaction to specified `tx`.
    */
-  def setTransaction(tx: StatefulTransaction): Unit =threadLocalContext.set(tx)
+  def setTransaction(tx: StatefulTransaction): Unit = threadLocalContext.set(tx)
 
   /**
    * Open new stateful transaction.
@@ -118,12 +119,20 @@ object DefaultTransactionManager extends TransactionManager
  * The point to use extra-layer above standard JDBC connections is to maintain
  * a cache for each transaction.
  */
+@throws(classOf[SQLException])
 class StatefulTransaction {
-
+  private val log = Logger.getLogger(this.getClass.getName)
+  
   /**
    * Undelying JDBC connection.
    */
-  val connection: Connection = ORM.connectionProvider.openConnection
+  val connection: Connection = {
+    try {
+      ORM.connectionProvider.openConnection
+    } catch {
+      case ex => log.log(Level.SEVERE, ex.getMessage, ex); throw ex
+    }
+  }
 
   /**
    * Should underlying connection be closed on `commit` or `rollback`?
