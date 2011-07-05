@@ -126,6 +126,7 @@ class StatefulTransaction {
   /**
    * Undelying JDBC connection.
    */
+  @throws(classOf[SQLException])
   val connection: Connection = {
     try {
       ORM.connectionProvider.openConnection
