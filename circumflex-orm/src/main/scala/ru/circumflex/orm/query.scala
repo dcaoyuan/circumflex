@@ -4,6 +4,7 @@ import JDBC._
 import java.sql.ResultSet
 import java.sql.PreparedStatement
 import collection.mutable.ListBuffer
+import java.sql.SQLException
 import ru.circumflex.orm.avro.Avro
 import ru.circumflex.orm.avro.AvroNode
 
@@ -129,6 +130,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
   /**
    * Execute a query, open a JDBC `ResultSet` and executes specified `actions`.
    */
+  @throws(classOf[SQLException])
   def resultSet[A](action: ResultSet => A): A = {
 
     projections foreach setProjectionQuery
@@ -141,6 +143,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
     result
   }
 
+  @throws(classOf[SQLException])
   protected def query[A](postAction: ResultSet => A): A = {
     val sql = toSql
     sqlLog.debug(sql)
@@ -161,6 +164,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
   /**
    * Execute a query and return `Seq[T]`, where `T` is designated by query projection.
    */
+  @throws(classOf[SQLException])
   def list(): Seq[T] = resultSet{rs =>
     val result = new ListBuffer[T]()
     while (rs.next) result += read(rs)
@@ -172,6 +176,8 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
    *
    * An exception is thrown if result set yields more than one row.
    */
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
   def unique(): Option[T] = resultSet{rs =>
     if (!rs.next) None
     else if (rs.isLast) Some(read(rs))
@@ -243,6 +249,7 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
    */
   override def projections = List(projection) ++ _auxProjections
   
+  @throws(classOf[SQLException])
   override protected def query[A](postAction: ResultSet => A): A = {
     from.filter(_.isInstanceOf[AvroNode[_]]) match {
       case Seq() => super.query(postAction)

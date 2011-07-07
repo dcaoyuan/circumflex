@@ -63,17 +63,20 @@ trait TransactionManager {
   /**
    * Open new stateful transaction.
    */
+  @throws(classOf[SQLException])
   def openTransaction(): StatefulTransaction = new StatefulTransaction()
 
   /**
    * A shortcut for `getTransaction.sql(sql)(actions)`.
    */
+  @throws(classOf[SQLException])
   def sql[A](sql: String)(actions: PreparedStatement => A) =
     getTransaction.sql(sql)(actions)
 
   /**
    * A shortcut for `getTransaction.dml(actions)`.
    */
+  @throws(classOf[SQLException])
   def dml[A](actions: Connection => A) =
     getTransaction.dml(actions)
 
@@ -87,6 +90,7 @@ trait TransactionManager {
    * The contextual transaction is replaced with specified `transaction` and
    * is restored after the execution of `block`.
    */
+  @throws(classOf[SQLException])
   def executeInContext(transaction: StatefulTransaction)(block: => Unit) = {
     val prevTx: StatefulTransaction = if (hasLiveTransaction_?) getTransaction else null
     try {
@@ -155,6 +159,7 @@ class StatefulTransaction {
   /**
    * Commit the transaction (and close underlying connection if `autoClose` is set to `true`).
    */
+  @throws(classOf[SQLException])
   def commit(): Unit = try {
     if (!live_?) return
     connection.commit
@@ -166,6 +171,7 @@ class StatefulTransaction {
   /**
    * Rollback the transaction (and close underlying connection if `autoClose` is set to `true`).
    */
+  @throws(classOf[SQLException])
   def rollback(): Unit = try {
     if (!live_?) return
     connection.rollback
@@ -186,6 +192,7 @@ class StatefulTransaction {
    * Close the underlying connection and dispose of any resources associated with this
    * transaction.
    */
+  @throws(classOf[SQLException])
   def close(): Unit = {
     if (!live_?) return
     else connection.close()
@@ -206,6 +213,7 @@ class StatefulTransaction {
   /**
    * Prepare SQL statement and execute an attached block within the transaction scope.
    */
+  @throws(classOf[SQLException])
   def sql[A](sql: String)(actions: PreparedStatement => A): A = {
     val st = connection.prepareStatement(sql)
     try {
@@ -218,6 +226,7 @@ class StatefulTransaction {
   /**
    * Execute a block with DML-like actions in state-safe manner (does cleanup afterwards).
    */
+  @throws(classOf[SQLException])
   def dml[A](actions: Connection => A): A = try {
     actions(connection)
   } finally {

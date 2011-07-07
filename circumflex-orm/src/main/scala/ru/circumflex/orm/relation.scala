@@ -7,6 +7,7 @@ import org.aiotrade.lib.util.ClassVar
 import org.aiotrade.lib.util.config.Config
 import java.lang.reflect.Method
 import java.sql.PreparedStatement
+import java.sql.SQLException
 import scala.collection.mutable
 
 // ## Relations registry
@@ -281,6 +282,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     .ON_UPDATE(a.onUpdate)
   }
 
+  @throws(classOf[ORMException])
   protected[orm] def init {
     if (!_initialized) this.synchronized {
       if (!_initialized) try {
@@ -319,6 +321,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   /**
    * Fetch all records.
    */
+  @throws(classOf[SQLException])
   def all(limit: Int = -1, offset: Int = 0): Seq[R] = {
     this.criteria.limit(limit).offset(offset).list
   }
@@ -369,6 +372,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    *
    * This method must be called immediately after `insert_!`.
    */
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
   def refetchLast(record: R) {
     val root = this
     SELECT (root.*) FROM root WHERE (ORM.dialect.lastIdExpression(root)) unique match {
@@ -377,6 +382,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     }
   }
 
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
   def refetchLast(record: R, latestId: Long) {
     val root = this
     val latestIdEq = if (latestId != -1)
@@ -417,6 +424,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    * with default values), otherwise only specified `fields` participate
    * in the statement.
    */
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
   def insert_!(record: R, fields: Field[R, _]*): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
@@ -450,17 +459,25 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       }
     }
   }
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
   def INSERT_!(record: R, fields: Field[R, _]*): Int = insert_!(record, fields: _*)
 
   /**
    * Validates record and executes `insert_!` on success.
    */
+  @throws(classOf[SQLException])
+  @throws(classOf[ValidationException])
   def insert(record: R, fields: Field[R, _]*): Int = validate(record) match {
     case None => insert_!(record, fields: _*)
     case Some(errors) => throw new ValidationException(errors: _*)
   }
+  @throws(classOf[SQLException])
+  @throws(classOf[ValidationException])
   def INSERT(record: R, fields: Field[R, _]*) = insert(record, fields: _*)
 
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
   def insertBatch_!(records: Array[R], isAutoId: Boolean = true): Int = {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
@@ -516,6 +533,8 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     }
   }
 
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
   def insertBatch(records: Array[R], isAutoId: Boolean = true): Int = {
     validate(records)
     insertBatch_!(records, isAutoId)
@@ -526,197 +545,218 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    * If no `fields` specified, performs full update, otherwise only specified
    * `fields` participate in the statement.
    */
-   def update_!(record: R, fields: Field[R, _]*): Int = {
-      if (readOnly_?)
-        throw new ORMException("The relation " + qualifiedName + " is read-only.")
-      else {
-        ORM.transactionManager.dml{conn =>
-          // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
-          val fs = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
-          val sql = ORM.dialect.updateRecord(this, fs)
-          sqlLog.debug(sql)
-          auto(conn.prepareStatement(sql)){st =>
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def update_!(record: R, fields: Field[R, _]*): Int = {
+    if (readOnly_?)
+      throw new ORMException("The relation " + qualifiedName + " is read-only.")
+    else {
+      ORM.transactionManager.dml{conn =>
+        // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
+        val fs = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
+        val sql = ORM.dialect.updateRecord(this, fs)
+        sqlLog.debug(sql)
+        auto(conn.prepareStatement(sql)){st =>
+          setParams(record, st, fs)
+          ORM.typeConverter.write(st, idOf(record), fs.size + 1)
+          st.executeUpdate
+        }
+      }
+    }
+  }
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def UPDATE_!(record: R, fields: Field[R, _]*): Int = update_!(record, fields: _*)
+
+  /**
+   * Validates record and executes `update_!` on success.
+   */
+  @throws(classOf[SQLException])
+  @throws(classOf[ValidationException])
+  def update(record: R, fields: Field[R, _]*): Int = validate(record) match {
+    case None => update_!(record, fields: _*)
+    case Some(errors) => throw new ValidationException(errors: _*)
+  }
+  def UPDATE(record: R, fields: Field[R, _]*) = update(record, fields: _*)
+
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def updateBatch_!(records: Array[R], fields: Field[R, _]*): Int = {
+    if (readOnly_?)
+      throw new ORMException("The relation " + qualifiedName + " is read-only.")
+    else {
+      if (records.length == 0) return 0
+      ORM.transactionManager.dml{conn =>
+        // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
+        val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
+        val sql = ORM.dialect.updateRecord(this, fs)
+        sqlLog.debug(sql)
+        auto(conn.prepareStatement(sql)){st =>
+          val paramIdx = fs.size + 1
+          var i = 0
+          while (i < records.length) {
+            val record = records(i)
             setParams(record, st, fs)
-            ORM.typeConverter.write(st, idOf(record), fs.size + 1)
-            st.executeUpdate
+            ORM.typeConverter.write(st, idOf(record), paramIdx)
+            st.addBatch
+            i += 1
           }
-        }
-      }
-    }
-   def UPDATE_!(record: R, fields: Field[R, _]*): Int = update_!(record, fields: _*)
-
-   /**
-    * Validates record and executes `update_!` on success.
-    */
-   def update(record: R, fields: Field[R, _]*): Int = validate(record) match {
-      case None => update_!(record, fields: _*)
-      case Some(errors) => throw new ValidationException(errors: _*)
-    }
-   def UPDATE(record: R, fields: Field[R, _]*) = update(record, fields: _*)
-
-   def updateBatch_!(records: Array[R], fields: Field[R, _]*): Int = {
-      if (readOnly_?)
-        throw new ORMException("The relation " + qualifiedName + " is read-only.")
-      else {
-        if (records.length == 0) return 0
-        ORM.transactionManager.dml{conn =>
-          // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
-          val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
-          val sql = ORM.dialect.updateRecord(this, fs)
-          sqlLog.debug(sql)
-          auto(conn.prepareStatement(sql)){st =>
-            val paramIdx = fs.size + 1
-            var i = 0
-            while (i < records.length) {
-              val record = records(i)
-              setParams(record, st, fs)
-              ORM.typeConverter.write(st, idOf(record), paramIdx)
-              st.addBatch
-              i += 1
-            }
         
-            val rows = st.executeBatch
-            var count = 0
-            var j = 0
-            while (j < rows.length) {
-              if (rows(j) > 0) {
-                count += 1
-              }
-              j += 1
+          val rows = st.executeBatch
+          var count = 0
+          var j = 0
+          while (j < rows.length) {
+            if (rows(j) > 0) {
+              count += 1
             }
-            count
+            j += 1
           }
+          count
         }
       }
     }
+  }
 
-   def updateBatch(records: Array[R], fields: Field[R, _]*): Int = {
-      validate(records)
-      updateBatch_!(records, fields: _*)
-    }
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def updateBatch(records: Array[R], fields: Field[R, _]*): Int = {
+    validate(records)
+    updateBatch_!(records, fields: _*)
+  }
 
-   /**
-    * Executes the `DELETE` statement for this record using primary key
-    * as delete criteria.
-    */
-   def delete_!(record: R): Int = {
-      if (readOnly_?)
-        throw new ORMException("The relation " + qualifiedName + " is read-only.")
-      else {
-        ORM.transactionManager.dml{conn =>
-          val sql = ORM.dialect.deleteRecord(this)
-          sqlLog.debug(sql)
-          auto(conn.prepareStatement(sql)){st =>
-            ORM.typeConverter.write(st, idOf(record), 1)
-            st.executeUpdate
-          }
+  /**
+   * Executes the `DELETE` statement for this record using primary key
+   * as delete criteria.
+   */
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def delete_!(record: R): Int = {
+    if (readOnly_?)
+      throw new ORMException("The relation " + qualifiedName + " is read-only.")
+    else {
+      ORM.transactionManager.dml{conn =>
+        val sql = ORM.dialect.deleteRecord(this)
+        sqlLog.debug(sql)
+        auto(conn.prepareStatement(sql)){st =>
+          ORM.typeConverter.write(st, idOf(record), 1)
+          st.executeUpdate
         }
       }
     }
-   def DELETE_!(record: R): Int = delete_!(record)
+  }
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def DELETE_!(record: R): Int = delete_!(record)
 
-   /**
-    * If record's `id` field is not `NULL` perform `update`, otherwise perform `insert`
-    * and then refetch record using last generated identity.
-    */
-   def save_!(record: R): Int = if (transient_?(record)) {
-      val rows = insert_!(record)
-      // why should refetch all this record when save? I have set record id at insert_!
-      //refetchLast(record, latestId)
-      rows
-    } else update_!(record)
+  /**
+   * If record's `id` field is not `NULL` perform `update`, otherwise perform `insert`
+   * and then refetch record using last generated identity.
+   */
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def save_!(record: R): Int = if (transient_?(record)) {
+    val rows = insert_!(record)
+    // why should refetch all this record when save? I have set record id at insert_!
+    //refetchLast(record, latestId)
+    rows
+  } else update_!(record)
 
-   /**
-    * Validates record and executes `save_!` on success.
-    */
-   def save(record: R): Int = validate(record) match {
-      case None => save_!(record)
-      case Some(errors) => throw new ValidationException(errors: _*)
+  /**
+   * Validates record and executes `save_!` on success.
+   */
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  @throws(classOf[ValidationException])
+  def save(record: R): Int = validate(record) match {
+    case None => save_!(record)
+    case Some(errors) => throw new ValidationException(errors: _*)
+  }
+
+  /**
+   * Invalidates transaction-scoped cache for this record and refetches it from database.
+   */
+  @throws(classOf[SQLException])
+  @throws(classOf[ORMException])
+  def refresh(record: R): this.type = if (transient_?(record))
+    throw new ORMException("Could not refresh transient record.")
+  else {
+    tx.evictRecordCache(this, record)
+    val root = this
+    val id = idOf(record).get
+    SELECT (root.*) FROM root WHERE (root.id EQ id) unique match {
+      case Some(r: R) => copyFields(r, record)
+      case _ =>
+        throw new ORMException("Could not locate record with id = " + id + " in database.")
     }
+    return this
+  }
 
-   /**
-    * Invalidates transaction-scoped cache for this record and refetches it from database.
-    */
-   def refresh(record: R): this.type = if (transient_?(record))
-     throw new ORMException("Could not refresh transient record.")
-   else {
-      tx.evictRecordCache(this, record)
-      val root = this
-      val id = idOf(record).get
-      SELECT (root.*) FROM root WHERE (root.id EQ id) unique match {
-        case Some(r: R) => copyFields(r, record)
-        case _ =>
-          throw new ORMException("Could not locate record with id = " + id + " in database.")
+  def exists: Boolean = {
+    val sql = "select * from " + qualifiedName + " where 1 = 0"
+    sqlLog.debug(sql)
+    try {
+      ORM.transactionManager.sql(sql){st =>
+        try {
+          val rs = st.executeQuery
+          rs.close
+          true
+        } catch {case _ => false}
       }
-      return this
-    }
-
-   def exists: Boolean = {
-      val sql = "select * from " + qualifiedName + " where 1 = 0"
-      sqlLog.debug(sql)
-      try {
-        ORM.transactionManager.sql(sql){st =>
-          try {
-            val rs = st.executeQuery
-            rs.close
-            true
-          } catch {case _ => false}
-        }
-      } catch {case _ => false}
-    }
+    } catch {case _ => false}
+  }
 
 
-   override def equals(that: Any) = that match {
-      case r: Relation[R] => r.relationName.equalsIgnoreCase(this.relationName)
-      case _ => false
-    }
+  override def equals(that: Any) = that match {
+    case r: Relation[R] => r.relationName.equalsIgnoreCase(this.relationName)
+    case _ => false
+  }
 
-   override def hashCode = this.relationName.toLowerCase.hashCode
+  override def hashCode = this.relationName.toLowerCase.hashCode
 
-   override def toString = qualifiedName
+  override def toString = qualifiedName
 
-   }
+}
 
 // ## Table
 
-   abstract class Table[R: Manifest] extends Relation[R] with SchemaObject {
-      val objectName = "TABLE " + qualifiedName
-      def sqlDrop = {
-        init
-        ORM.dialect.dropTable(this)
-      }
+abstract class Table[R: Manifest] extends Relation[R] with SchemaObject {
+  val objectName = "TABLE " + qualifiedName
+  def sqlDrop = {
+    init
+    ORM.dialect.dropTable(this)
+  }
   
-      def sqlCreate = {
-        init
-        ORM.dialect.createTable(this)
-      }
-    }
+  def sqlCreate = {
+    init
+    ORM.dialect.createTable(this)
+  }
+}
 
 // ## View
 
-   abstract class View[R: Manifest] extends Relation[R] with SchemaObject {
+abstract class View[R: Manifest] extends Relation[R] with SchemaObject {
 
-      // ### Miscellaneous
+  // ### Miscellaneous
 
-      val objectName = "VIEW " + qualifiedName
-      def sqlDrop = {
-        init
-        ORM.dialect.dropView(this)
-      }
+  val objectName = "VIEW " + qualifiedName
+  def sqlDrop = {
+    init
+    ORM.dialect.dropView(this)
+  }
 
-      def sqlCreate = {
-        init
-        ORM.dialect.createView(this)
-      }
+  def sqlCreate = {
+    init
+    ORM.dialect.createView(this)
+  }
 
-      /**
-       * Views are not updatable by default.
-       */
-      override def readOnly_?() = true
+  /**
+   * Views are not updatable by default.
+   */
+  override def readOnly_?() = true
 
-      /**
-       * A `query` that makes up this view definition.
-       */
-      def query: Select[_]
+  /**
+   * A `query` that makes up this view definition.
+   */
+  def query: Select[_]
 
-    }
+}
