@@ -134,10 +134,9 @@ object DefaultConnectionProvider extends ConnectionProvider {
     case Some("read_committed") => Connection.TRANSACTION_READ_COMMITTED
     case Some("repeatable_read") => Connection.TRANSACTION_REPEATABLE_READ
     case Some("serializable") => Connection.TRANSACTION_SERIALIZABLE
-    case _ => {
-        log.info("Using READ COMMITTED isolation, override 'orm.connection.isolation' if necesssary.")
-        Connection.TRANSACTION_READ_COMMITTED
-      }
+    case _ => 
+      log.info("Using READ COMMITTED isolation, override 'orm.connection.isolation' if necesssary.")
+      Connection.TRANSACTION_READ_COMMITTED
   }
 
   /**
@@ -145,58 +144,58 @@ object DefaultConnectionProvider extends ConnectionProvider {
    * is specified or is constructed using c3p0 otherwise.
    */
   protected val ds: DataSource = config.getString("orm.connection.datasource") match {
-    case Some(jndiName: String) => {
-        val ctx = new InitialContext
-        val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
-        log.info("Using JNDI datasource: " + jndiName)
-        ds
+    case Some(jndiName: String) => 
+      val ctx = new InitialContext
+      val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
+      log.info("Using JNDI datasource: " + jndiName)
+      ds
+    case _ => 
+      log.info("Using c3p0 connection pooling.")
+      val driver = config.getString("orm.connection.driver") match {
+        case Some(s: String) => s
+        case _ =>
+          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.driver'.")
       }
-    case _ => {
-        log.info("Using c3p0 connection pooling.")
-        val driver = config.getString("orm.connection.driver") match {
-          case Some(s: String) => s
-          case _ =>
-            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.driver'.")
-        }
-        val url = config.getString("orm.connection.url") match {
-          case Some(s: String) => s
-          case _ =>
-            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.url'.")
-        }
-        val username = config.getString("orm.connection.username") match {
-          case Some(s: String) => s
-          case _ =>
-            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.username'.")
-        }
-        val password = config.getString("orm.connection.password") match {
-          case Some(s: String) => s
-          case _ =>
-            throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.password'.")
-        }
-        val ds = new ComboPooledDataSource()
-        ds.setDriverClass(driver)
-        ds.setJdbcUrl(url)
-        ds.setUser(username)
-        ds.setPassword(password)
-
-
-        // --- optional config
-        ds.setInitialPoolSize(config.getInt("orm.connection.initialPoolSize", 4))
-        ds.setMinPoolSize(config.getInt("orm.connection.minPoolSize", 4))
-        ds.setMaxPoolSize(config.getInt("orm.connection.maxPoolSize", 100))
-        ds.setAcquireIncrement(config.getInt("orm.connection.acquireIncrement", 4))
-
-        ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2 hours
-        ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 3000)) // default 50 mins. After which an idle connection is removed from the pool.
-        
-        // combination of verifying:
-        ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 600)) // default 10 mins
-        ds.setPreferredTestQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
-        ds.setTestConnectionOnCheckin(config.getBool("orm.connection.testConnectionOnCheckin", true))
-        ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", false))
-        
-        ds
+      val url = config.getString("orm.connection.url") match {
+        case Some(s: String) => s
+        case _ =>
+          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.url'.")
       }
+      val username = config.getString("orm.connection.username") match {
+        case Some(s: String) => s
+        case _ =>
+          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.username'.")
+      }
+      val password = config.getString("orm.connection.password") match {
+        case Some(s: String) => s
+        case _ =>
+          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.password'.")
+      }
+        
+      val ds = new ComboPooledDataSource()
+      // --- connection config
+      ds.setDriverClass(driver)
+      ds.setJdbcUrl(url)
+      ds.setUser(username)
+      ds.setPassword(password)
+
+      // --- pool size config
+      ds.setInitialPoolSize(config.getInt("orm.connection.initialPoolSize", 4))
+      ds.setMinPoolSize(config.getInt("orm.connection.minPoolSize", 4))
+      ds.setMaxPoolSize(config.getInt("orm.connection.maxPoolSize", 100))
+      ds.setAcquireIncrement(config.getInt("orm.connection.acquireIncrement", 4))
+
+      // --- timeout config
+      ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2 hours
+      ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 3000)) // default 50 mins. After which an idle connection is removed from the pool.
+      ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 600)) // default 10 mins, must less than maxIdleTime
+        
+      // --- verifying config
+      ds.setPreferredTestQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
+      ds.setTestConnectionOnCheckin(config.getBool("orm.connection.testConnectionOnCheckin", true))
+      ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", false))
+        
+      ds
   }
 
   def dataSource: DataSource = ds

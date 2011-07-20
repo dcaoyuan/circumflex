@@ -177,7 +177,7 @@ class StatefulTransaction {
     connection.rollback
   } finally {
     cleanup()
-    if (autoClose) connection.close
+    if (autoClose) close()
   }
 
   /**
