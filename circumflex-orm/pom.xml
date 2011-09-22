@@ -32,9 +32,15 @@
         </dependency>
 
         <dependency>
-            <groupId>c3p0</groupId>
-            <artifactId>c3p0</artifactId>
-            <version>0.9.1.2</version>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>tomcat-jdbc</artifactId>
+            <version>7.0.21</version>
+        </dependency>
+        
+        <dependency> <!-- required by tomcat-jdbc -->
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>juli</artifactId>
+            <version>6.0.33</version>
         </dependency>
 
         <dependency>

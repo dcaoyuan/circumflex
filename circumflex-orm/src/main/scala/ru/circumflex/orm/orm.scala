@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import com.mchange.v2.c3p0.ComboPooledDataSource
 import java.sql.{Timestamp, PreparedStatement, ResultSet, Connection, SQLException}
 import java.util.Date
 import java.util.logging.Logger
@@ -8,6 +7,7 @@ import javax.naming.InitialContext
 import javax.sql.DataSource
 import org.aiotrade.lib.util.config.Config
 import org.aiotrade.lib.util.config.ConfigurationException
+import org.apache.tomcat.jdbc.pool.PoolProperties
 
 // ## Configuration
 
@@ -105,7 +105,7 @@ trait ConnectionProvider {
  *  * if `orm.connection.datasource` is set, use it to acquire data source
  *  from JNDI;
  *  * if `orm.connection.datasource` is missing, construct a connection
- *  pool using [c3p0][] and following configuration parameters:
+ *  pool using and following configuration parameters:
  *     * `orm.connection.driver`
  *     * `orm.connection.url`
  *     * `orm.connection.username`
@@ -150,7 +150,7 @@ object DefaultConnectionProvider extends ConnectionProvider {
       log.info("Using JNDI datasource: " + jndiName)
       ds
     case _ => 
-      log.info("Using c3p0 connection pooling.")
+      log.info("Using connection pooling.")
       val driver = config.getString("orm.connection.driver") match {
         case Some(s: String) => s
         case _ =>
@@ -171,31 +171,63 @@ object DefaultConnectionProvider extends ConnectionProvider {
         case _ =>
           throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.password'.")
       }
-        
-      val ds = new ComboPooledDataSource()
+      
+      val p = new PoolProperties()
       // --- connection config
-      ds.setDriverClass(driver)
-      ds.setJdbcUrl(url)
-      ds.setUser(username)
-      ds.setPassword(password)
+      p.setDriverClassName(driver)
+      p.setUrl(url)
+      p.setUsername(username)
+      p.setPassword(password)
 
       // --- pool size config
-      ds.setInitialPoolSize(config.getInt("orm.connection.initialPoolSize", 4))
-      ds.setMinPoolSize(config.getInt("orm.connection.minPoolSize", 4))
-      ds.setMaxPoolSize(config.getInt("orm.connection.maxPoolSize", 100))
-      ds.setAcquireIncrement(config.getInt("orm.connection.acquireIncrement", 4))
+      p.setInitialSize(config.getInt("orm.connection.initialPoolSize", 4))
+      p.setMinIdle(config.getInt("orm.connection.minPoolSize", 4))
+      p.setMaxActive(config.getInt("orm.connection.maxPoolSize", 100))
 
       // --- timeout config
-      ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2 hours
-      ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 3000)) // default 50 mins. After which an idle connection is removed from the pool.
-      ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 600)) // default 10 mins, must less than maxIdleTime
-        
+      p.setTimeBetweenEvictionRunsMillis(config.getInt("orm.connection.maxIdleTime", 3000) * 1000) // default 50 mins. After which an idle connection is removed from the pool.
+      p.setRemoveAbandoned(true)
+      p.setRemoveAbandonedTimeout(config.getInt("orm.connection.abandonedTimeout", 6000)) // 100 mins, Timeout in seconds before an abandoned(in use) connection can be removed
+      p.setMinEvictableIdleTimeMillis(60000)
+
       // --- verifying config
-      ds.setPreferredTestQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
-      ds.setTestConnectionOnCheckin(config.getBool("orm.connection.testConnectionOnCheckin", true))
-      ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", false))
-        
+      p.setTestWhileIdle(false)
+      p.setTestOnBorrow(config.getBool("orm.connection.testConnectionOnCheckout", false))
+      p.setTestOnReturn(config.getBool("orm.connection.testConnectionOnCheckin", true))
+      p.setValidationQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
+      p.setValidationInterval(config.getInt("orm.connection.connectionTestPeriod", 600) * 1000) // milliseconds, default 10 mins, must be less than maxIdleTime
+
+      p.setLogAbandoned(false)
+      
+      val ds = new org.apache.tomcat.jdbc.pool.DataSource()
+      ds.setPoolProperties(p)
       ds
+      
+// ----- c3p0 configuration
+//      val ds = new ComboPooledDataSource()
+//      // --- connection config
+//      ds.setDriverClass(driver)
+//      ds.setJdbcUrl(url)
+//      ds.setUser(username)
+//      ds.setPassword(password)
+//
+//      // --- pool size config
+//      ds.setInitialPoolSize(config.getInt("orm.connection.initialPoolSize", 4))
+//      ds.setMinPoolSize(config.getInt("orm.connection.minPoolSize", 4))
+//      ds.setMaxPoolSize(config.getInt("orm.connection.maxPoolSize", 100))
+//      ds.setAcquireIncrement(config.getInt("orm.connection.acquireIncrement", 4))
+//
+//      // --- timeout config
+//      ds.setMaxConnectionAge(config.getInt("orm.connection.maxConnectionAge", 7200)) // default 2 hours
+//      ds.setMaxIdleTime(config.getInt("orm.connection.maxIdleTime", 3000)) // default 50 mins. After which an idle connection is removed from the pool.
+//      ds.setIdleConnectionTestPeriod(config.getInt("orm.connection.connectionTestPeriod", 600)) // default 10 mins, must less than maxIdleTime
+//        
+//      // --- verifying config
+//      ds.setPreferredTestQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
+//      ds.setTestConnectionOnCheckin(config.getBool("orm.connection.testConnectionOnCheckin", true))
+//      ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", false))
+//        
+//      ds
   }
 
   def dataSource: DataSource = ds
