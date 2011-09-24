@@ -1,7 +1,5 @@
 package ru.circumflex.orm
 
-import JDBC._
-
 // ## Record
 
 /**

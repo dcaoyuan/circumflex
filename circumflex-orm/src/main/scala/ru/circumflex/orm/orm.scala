@@ -6,7 +6,6 @@ import java.util.logging.Logger
 import javax.naming.InitialContext
 import javax.sql.DataSource
 import org.aiotrade.lib.util.config.Config
-import org.aiotrade.lib.util.config.ConfigurationException
 import org.apache.tomcat.jdbc.pool.PoolProperties
 
 // ## Configuration
@@ -127,8 +126,10 @@ trait ConnectionProvider {
 object DefaultConnectionProvider extends ConnectionProvider {
   import ORM._
   private val log = Logger.getLogger(getClass.getName)
+  
+  private val autocommit: Boolean = config.getBool("orm.connection.autocommit", false)
 
-  protected val isolation: Int = config.getString("orm.connection.isolation") match {
+  private val isolation: Int = config.getString("orm.connection.isolation") match {
     case Some("none") => Connection.TRANSACTION_NONE
     case Some("read_uncommitted") => Connection.TRANSACTION_READ_UNCOMMITTED
     case Some("read_committed") => Connection.TRANSACTION_READ_COMMITTED
@@ -144,33 +145,18 @@ object DefaultConnectionProvider extends ConnectionProvider {
    * is specified or is constructed using c3p0 otherwise.
    */
   protected val ds: DataSource = config.getString("orm.connection.datasource") match {
-    case Some(jndiName: String) => 
+    case Some(jndiName) => 
       val ctx = new InitialContext
       val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
       log.info("Using JNDI datasource: " + jndiName)
       ds
     case _ => 
       log.info("Using connection pooling.")
-      val driver = config.getString("orm.connection.driver") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.driver'.")
-      }
-      val url = config.getString("orm.connection.url") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.url'.")
-      }
-      val username = config.getString("orm.connection.username") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.username'.")
-      }
-      val password = config.getString("orm.connection.password") match {
-        case Some(s: String) => s
-        case _ =>
-          throw new ConfigurationException("Missing mandatory configuration parameter 'orm.connection.password'.")
-      }
+      
+      val driver = config.getString("orm.connection.driver") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.driver'.")}
+      val url = config.getString("orm.connection.url") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.url'.")}
+      val username = config.getString("orm.connection.username") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.username'.")}
+      val password = config.getString("orm.connection.password") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.password'.")}
       
       val p = new PoolProperties()
       // --- connection config
@@ -191,11 +177,11 @@ object DefaultConnectionProvider extends ConnectionProvider {
       p.setMinEvictableIdleTimeMillis(60000)
 
       // --- verifying config
-      p.setTestWhileIdle(false)
-      p.setTestOnBorrow(config.getBool("orm.connection.testConnectionOnCheckout", false))
-      p.setTestOnReturn(config.getBool("orm.connection.testConnectionOnCheckin", true))
-      p.setValidationQuery(config.getString("orm.connection.preferredTestQuery", "SELECT 1"))
-      p.setValidationInterval(config.getInt("orm.connection.connectionTestPeriod", 600) * 1000) // milliseconds, default 10 mins, must be less than maxIdleTime
+      p.setValidationQuery(config.getString("orm.connection.testQuery", "SELECT 1"))
+      p.setTestOnBorrow(config.getBool("orm.connection.testOnBorrow", true))
+      p.setTestOnReturn(config.getBool("orm.connection.testOnReturn", false))
+      p.setTestWhileIdle(config.getBool("orm.connection.testWhileIdle", true))
+      p.setValidationInterval(config.getInt("orm.connection.testPeriod", 30) * 1000) // milliseconds, default 30 seconds, must be less than maxIdleTime
 
       p.setLogAbandoned(false)
       
@@ -238,9 +224,9 @@ object DefaultConnectionProvider extends ConnectionProvider {
   @throws(classOf[SQLException])
   def openConnection: Connection = {
     val conn = dataSource.getConnection
-    conn.setAutoCommit(false)
+    conn.setAutoCommit(autocommit)
     conn.setTransactionIsolation(isolation)
-    return conn
+    conn
   }
 
 }

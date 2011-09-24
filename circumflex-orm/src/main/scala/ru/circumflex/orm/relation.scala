@@ -1,7 +1,7 @@
 package ru.circumflex.orm
 
-import JDBC._
 import java.sql.Statement
+import java.util.logging.Logger
 import org.aiotrade.lib.collection.WeakIdentityBiHashMap
 import org.aiotrade.lib.util.ClassVar
 import org.aiotrade.lib.util.config.Config
@@ -36,7 +36,8 @@ object RelationRegistry {
 // ## Relation
 
 abstract class Relation[R](implicit m: Manifest[R]) {
-
+  private val log = Logger.getLogger(this.getClass.getName)
+  
   protected var _initialized = false
   
   /**
@@ -197,7 +198,9 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       recordToPk.writeLock.unlock
     }
   }
-  def invalideCaches {recordToPk = WeakIdentityBiHashMap[R, Long]()}
+  def invalideCaches {
+    recordToPk = WeakIdentityBiHashMap[R, Long]()
+  }
 
   /**
    * Yield `true` if `primaryKey` field is empty (contains `None`).
@@ -430,33 +433,34 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
-      ORM.transactionManager.dml{conn =>
+      tx.execute{conn =>
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(!_.null_?(record)) else fields
         val sql = ORM.dialect.insertRecord(this, fs)
-        sqlLog.debug(sql)
+        log.info(sql)
+        
         val isAutoId = !fs.contains(PRIMARY_KEY)
-        val stmt = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
-        auto(stmt){st =>
-          setParams(record, st, fs)
+        val st = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
+        setParams(record, st, fs)
           
-          val rows = st.executeUpdate
-          if (isAutoId) {
-            val keys = st.getGeneratedKeys
-            if (rows > 0 && keys.next) {
-              val key = keys.getLong(1)
-              // refresh key for this record
-              updateCache(key, record)
-            }
-          } else {
-            if (rows > 0) {
-              // if insert with assgined PK, refresh using id value of this record
-              val key = PRIMARY_KEY.getValue(record)
-              updateCache(key, record)
-            }
+        val rows = st.executeUpdate
+        if (isAutoId) {
+          val keys = st.getGeneratedKeys
+          if (rows > 0 && keys.next) {
+            val key = keys.getLong(1)
+            // refresh key for this record
+            updateCache(key, record)
           }
-          rows
+        } else {
+          if (rows > 0) {
+            // if insert with assgined PK, refresh using id value of this record
+            val key = PRIMARY_KEY.getValue(record)
+            updateCache(key, record)
+          }
         }
-      }
+        
+        st.close
+        rows
+      } { ex => throw ex}
     }
   }
   @throws(classOf[SQLException])
@@ -483,53 +487,54 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       if (records.length == 0) return 0
-      ORM.transactionManager.dml{conn =>
+      tx.execute{conn =>
         val fs = if (isAutoId) this.fields.filter(_ != PRIMARY_KEY) else this.fields
         val sql = ORM.dialect.insertRecord(this, fs)
-        sqlLog.debug(sql)
-        val stmt = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
-        auto(stmt){st =>
-          var i = 0
-          while (i < records.length) {
-            setParams(records(i), st, fs)
-            st.addBatch
-            i += 1
-          }
-
-          var count = 0
-          val rows = st.executeBatch
-          if (isAutoId) {
-            val keys = st.getGeneratedKeys
-            // RETURN_GENERATED_KEYS returns only one id (the first or the last)
-            var key = if (keys.next) keys.getLong(1) else -1
-            val idIsOfTheLastRecord = ORM.dialect.returnGeneratedKeysIsTheLast
-            var j = if (idIsOfTheLastRecord) rows.length - 1 else 0
-            while (j >= 0 && j < rows.length) {
-              if (rows(j) > 0) {
-                count += 1
-                if (key > 0) {
-                  // refresh id for this record
-                  updateCache(key, records(j))
-                  if (idIsOfTheLastRecord) key -= 1 else key += 1
-                }
-              }
-              if (idIsOfTheLastRecord) j -= 1 else j += 1
-            }
-          } else {
-            var j = 0
-            while (j < rows.length) {
-              if (rows(j) > 0) {
-                val record = records(j)
-                val key = PRIMARY_KEY.getValue(record)
-                updateCache(key, record)
-                count += 1
-              }
-              j += 1
-            }
-          }
-          count
+        log.info(sql)
+        
+        val st = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
+        var i = 0
+        while (i < records.length) {
+          setParams(records(i), st, fs)
+          st.addBatch
+          i += 1
         }
-      }
+
+        var count = 0
+        val rows = st.executeBatch
+        if (isAutoId) {
+          val keys = st.getGeneratedKeys
+          // RETURN_GENERATED_KEYS returns only one id (the first or the last)
+          var key = if (keys.next) keys.getLong(1) else -1
+          val idIsOfTheLastRecord = ORM.dialect.returnGeneratedKeysIsTheLast
+          var j = if (idIsOfTheLastRecord) rows.length - 1 else 0
+          while (j >= 0 && j < rows.length) {
+            if (rows(j) > 0) {
+              count += 1
+              if (key > 0) {
+                // refresh id for this record
+                updateCache(key, records(j))
+                if (idIsOfTheLastRecord) key -= 1 else key += 1
+              }
+            }
+            if (idIsOfTheLastRecord) j -= 1 else j += 1
+          }
+        } else {
+          var j = 0
+          while (j < rows.length) {
+            if (rows(j) > 0) {
+              val record = records(j)
+              val key = PRIMARY_KEY.getValue(record)
+              updateCache(key, record)
+              count += 1
+            }
+            j += 1
+          }
+        }
+        
+        st.close
+        count
+      } { ex => throw ex}
     }
   }
 
@@ -551,17 +556,20 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
-      ORM.transactionManager.dml{conn =>
+      tx.execute{conn =>
         // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
         val fs = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
-        sqlLog.debug(sql)
-        auto(conn.prepareStatement(sql)){st =>
-          setParams(record, st, fs)
-          ORM.typeConverter.write(st, idOf(record), fs.size + 1)
-          st.executeUpdate
-        }
-      }
+        log.info(sql)
+        
+        val st = conn.prepareStatement(sql) 
+        setParams(record, st, fs)
+        ORM.typeConverter.write(st, idOf(record), fs.size + 1)
+        val rows = st.executeUpdate
+        
+        st.close
+        rows
+      } {ex => throw ex}
     }
   }
   @throws(classOf[SQLException])
@@ -586,34 +594,36 @@ abstract class Relation[R](implicit m: Manifest[R]) {
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
       if (records.length == 0) return 0
-      ORM.transactionManager.dml{conn =>
+      tx.execute{conn =>
         // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
-        sqlLog.debug(sql)
-        auto(conn.prepareStatement(sql)){st =>
-          val paramIdx = fs.size + 1
-          var i = 0
-          while (i < records.length) {
-            val record = records(i)
-            setParams(record, st, fs)
-            ORM.typeConverter.write(st, idOf(record), paramIdx)
-            st.addBatch
-            i += 1
-          }
+        log.info(sql)
         
-          val rows = st.executeBatch
-          var count = 0
-          var j = 0
-          while (j < rows.length) {
-            if (rows(j) > 0) {
-              count += 1
-            }
-            j += 1
-          }
-          count
+        val st = conn.prepareStatement(sql)
+        val paramIdx = fs.size + 1
+        var i = 0
+        while (i < records.length) {
+          val record = records(i)
+          setParams(record, st, fs)
+          ORM.typeConverter.write(st, idOf(record), paramIdx)
+          st.addBatch
+          i += 1
         }
-      }
+        
+        val rows = st.executeBatch
+        var count = 0
+        var j = 0
+        while (j < rows.length) {
+          if (rows(j) > 0) {
+            count += 1
+          }
+          j += 1
+        }
+        
+        st.close
+        count
+      } {ex => throw ex}
     }
   }
 
@@ -634,14 +644,17 @@ abstract class Relation[R](implicit m: Manifest[R]) {
     if (readOnly_?)
       throw new ORMException("The relation " + qualifiedName + " is read-only.")
     else {
-      ORM.transactionManager.dml{conn =>
+      tx.execute{conn =>
         val sql = ORM.dialect.deleteRecord(this)
-        sqlLog.debug(sql)
-        auto(conn.prepareStatement(sql)){st =>
-          ORM.typeConverter.write(st, idOf(record), 1)
-          st.executeUpdate
-        }
-      }
+        log.info(sql)
+        
+        val st = conn.prepareStatement(sql)
+        ORM.typeConverter.write(st, idOf(record), 1)
+        val rows = st.executeUpdate
+        
+        st.close
+        rows
+      } {ex => throw ex}
     }
   }
   @throws(classOf[SQLException])
@@ -692,19 +705,24 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   }
 
   def exists: Boolean = {
-    val sql = "select * from " + qualifiedName + " where 1 = 0"
-    sqlLog.debug(sql)
-    try {
-      ORM.transactionManager.sql(sql){st =>
-        try {
-          val rs = st.executeQuery
-          rs.close
-          true
-        } catch {case _ => false}
-      }
-    } catch {case _ => false}
-  }
+    tx.executeOnce{conn =>
+      val sql = "select * from " + qualifiedName + " where 1 = 0"
+      log.info(sql)
 
+      val ret = try {
+        val st = conn.prepareStatement(sql)
+        val rs = st.executeQuery
+
+        rs.close
+        st.close
+        true
+      } catch {
+        case _ => false
+      }
+      
+      ret
+    } {ex => throw ex}
+  }
 
   override def equals(that: Any) = that match {
     case r: Relation[R] => r.relationName.equalsIgnoreCase(this.relationName)
@@ -721,6 +739,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
 
 abstract class Table[R: Manifest] extends Relation[R] with SchemaObject {
   val objectName = "TABLE " + qualifiedName
+  
   def sqlDrop = {
     init
     ORM.dialect.dropTable(this)

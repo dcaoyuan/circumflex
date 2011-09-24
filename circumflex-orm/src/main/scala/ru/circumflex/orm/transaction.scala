@@ -1,6 +1,6 @@
 package ru.circumflex.orm
 
-import java.sql.{PreparedStatement, Connection, SQLException}
+import java.sql.{Connection, SQLException}
 import collection.mutable.HashMap
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -39,46 +39,46 @@ import java.util.logging.Logger
 trait TransactionManager {
   private val log = Logger.getLogger(getClass.getName)
   
-  private val threadLocalContext = new ThreadLocal[StatefulTransaction]
+  private val threadLocalContext = new ThreadLocal[Transaction]
 
   /**
    * Does transaction manager has live current transaction?
    */
   def hasLiveTransaction_?(): Boolean =
-    threadLocalContext.get != null && threadLocalContext.get.live_?
+    threadLocalContext.get != null && threadLocalContext.get.isLive
 
   /**
    * Retrieve a contextual transaction.
    */
-  def getTransaction: StatefulTransaction = {
+  def getTransaction: Transaction = {
     if (!hasLiveTransaction_?) threadLocalContext.set(openTransaction)
-    return threadLocalContext.get
+    threadLocalContext.get
   }
 
   /**
    * Sets a contextual transaction to specified `tx`.
    */
-  def setTransaction(tx: StatefulTransaction): Unit = threadLocalContext.set(tx)
+  def setTransaction(tx: Transaction): Unit = threadLocalContext.set(tx)
 
   /**
    * Open new stateful transaction.
    */
   @throws(classOf[SQLException])
-  def openTransaction(): StatefulTransaction = new StatefulTransaction()
+  def openTransaction(): Transaction = new Transaction()
 
   /**
    * A shortcut for `getTransaction.sql(sql)(actions)`.
    */
   @throws(classOf[SQLException])
-  def sql[A](sql: String)(actions: PreparedStatement => A) =
-    getTransaction.sql(sql)(actions)
+  def executeOnce[A](action: Connection => A)(errAction: Throwable => A) =
+    getTransaction.executeOnce(action)(errAction)
 
   /**
    * A shortcut for `getTransaction.dml(actions)`.
    */
   @throws(classOf[SQLException])
-  def dml[A](actions: Connection => A) =
-    getTransaction.dml(actions)
+  def execute[A](action: Connection => A)(errAction: Throwable => A) =
+    getTransaction.execute(action)(errAction)
 
   /**
    * Execute specified `block` in specified `transaction` context and
@@ -91,23 +91,23 @@ trait TransactionManager {
    * is restored after the execution of `block`.
    */
   @throws(classOf[SQLException])
-  def executeInContext(transaction: StatefulTransaction)(block: => Unit) = {
-    val prevTx: StatefulTransaction = if (hasLiveTransaction_?) getTransaction else null
+  def executeInContext(transaction: Transaction)(block: => Unit) = {
+    val prevTx: Transaction = if (hasLiveTransaction_?) getTransaction else null
     try {
       setTransaction(transaction)
       block
-      if (transaction.live_?) {
+      if (transaction.isLive) {
         transaction.commit
         log.fine("Committed current transaction.")
       }
     } catch {
       case e =>
-        if (transaction.live_?) {
+        if (transaction.isLive) {
           transaction.rollback
           log.warning("Rolled back current transaction.")
         }
         throw e
-    } finally if (transaction.live_?) {
+    } finally if (transaction.isLive) {
       transaction.close
       log.fine("Closed current connection.")
       setTransaction(prevTx)
@@ -124,68 +124,66 @@ object DefaultTransactionManager extends TransactionManager
  * a cache for each transaction.
  */
 @throws(classOf[SQLException])
-class StatefulTransaction {
+class Transaction {
   private val log = Logger.getLogger(this.getClass.getName)
+  
+  private var _connectionGotTime: Long = _
   
   /**
    * Undelying JDBC connection.
    */
+  private var _connection: Connection = _
+  def connection = _connection
+  
   @throws(classOf[SQLException])
-  val connection: Connection = {
-    try {
-      ORM.connectionProvider.openConnection
-    } catch {
-      case ex => log.log(Level.SEVERE, ex.getMessage, ex); throw ex
+  private def getConnection: Connection = {
+    if (_connection == null || _connection.isClosed) {
+      try {
+        _connection = ORM.connectionProvider.openConnection
+        _connectionGotTime = System.currentTimeMillis
+      } catch {
+        case ex => log.log(Level.SEVERE, ex.getMessage, ex); throw ex
+      }
     }
+    _connection
   }
 
   /**
    * Should underlying connection be closed on `commit` or `rollback`?
    */
-  protected var autoClose = true
+  protected var _isAutoClose = true
 
-  def setAutoClose(value: Boolean): this.type = {
-    this.autoClose = value
-    return this
+  def isAutoClose(): Boolean = _isAutoClose
+  def isAutoClose_=(value: Boolean): this.type = {
+    _isAutoClose = value
+    this
   }
-
-  def autoClose_?(): Boolean = this.autoClose
 
   /**
    * Is underlying connection alive?
+   * @Note: According to javadoc: connection.isClosed generally cannot be called to determine whether 
+   * a connection to a database is valid or invalid. A typical client can determine that a connection 
+   * is invalid by catching any exceptions that might be thrown when an operation is attempted.
    */
-  def live_?(): Boolean = connection != null && !connection.isClosed
+  def isLive(): Boolean = _connection != null && !_connection.isClosed
 
   /**
    * Commit the transaction (and close underlying connection if `autoClose` is set to `true`).
    */
   @throws(classOf[SQLException])
-  def commit(): Unit = try {
-    if (!live_?) return
-    connection.commit
-  } finally {
-    cleanup()
-    if (autoClose) close()
+  def commit() {
+    if (isLive && !_connection.getAutoCommit) _connection.commit
+    if (_isAutoClose) close()
   }
 
   /**
    * Rollback the transaction (and close underlying connection if `autoClose` is set to `true`).
    */
   @throws(classOf[SQLException])
-  def rollback(): Unit = try {
-    if (!live_?) return
-    connection.rollback
-  } finally {
-    cleanup()
-    if (autoClose) close()
-  }
-
-  /**
-   * Invalidate all caches and clears all state associated with this transaction.
-   */
-  def cleanup(): this.type = {
-    invalidateCaches
-    return this
+  def rollback() {
+    if (isLive && !_connection.getAutoCommit) _connection.rollback
+    // @todo invalidate relations cache
+    if (_isAutoClose) close()
   }
 
   /**
@@ -193,9 +191,8 @@ class StatefulTransaction {
    * transaction.
    */
   @throws(classOf[SQLException])
-  def close(): Unit = {
-    if (!live_?) return
-    else connection.close()
+  def close() {
+    if (isLive) _connection.close()
   }
   
   // ### Database communication methods
@@ -214,12 +211,13 @@ class StatefulTransaction {
    * Prepare SQL statement and execute an attached block within the transaction scope.
    */
   @throws(classOf[SQLException])
-  def sql[A](sql: String)(actions: PreparedStatement => A): A = {
-    val st = connection.prepareStatement(sql)
+  def execute[A](connAction: Connection => A)(errAction: Throwable => A): A = {
     try {
-      return actions(st)
-    } finally {
-      st.close
+      val conn = getConnection
+      val ret = connAction(conn)
+      ret
+    } catch {
+      case e => errAction(e)
     }
   }
 
@@ -227,13 +225,19 @@ class StatefulTransaction {
    * Execute a block with DML-like actions in state-safe manner (does cleanup afterwards).
    */
   @throws(classOf[SQLException])
-  def dml[A](actions: Connection => A): A = try {
-    actions(connection)
-  } finally {
-    cleanup()
+  def executeOnce[A](action: Connection => A)(errAction: Throwable => A): A = {
+    try {
+      val conn = getConnection
+      val ret = action(conn)
+      ret
+    } catch {
+      case e => errAction(e)
+    } finally {
+      close
+    }
   }
 
-  // ### Cache
+  // ### Cache  @TODO, use relations inner cache
 
   protected[orm] def key(relation: Relation[_], id: Long): String = relation.uuid + "@" + id
   protected[orm] def key(relation: Relation[_], id: Long, association: Association[_, _]): String =

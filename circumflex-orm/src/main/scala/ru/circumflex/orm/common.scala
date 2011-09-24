@@ -217,37 +217,12 @@ extends ParameterizedExpression {
   def toSql = expression + " " + _specificator
 }
 
-// ## JDBC utilities
-
-/**
- * Helper constructions that automatically close such JDBC objects as
- * `ResultSet`s and `PreparedStatement`s.
- */
-object JDBC {
-  protected[orm] val sqlLog = Logger.get("ru.circumflex.orm")
-
-  def autoClose[A <: {def close(): Unit}, B](obj: A)(actions: A => B)(errors: Throwable => B): B =
-    try {
-      return actions(obj)
-    } catch {
-      case e =>
-        sqlLog.warning(e, e.getMessage)
-        return errors(e)
-    } finally {
-      obj.close
-    }
-
-  def auto[A <: {def close(): Unit}, B](obj: A)(actions: A => B): B =
-    autoClose(obj)(actions)(throw _)
-}
-
 // ## Exceptions
 
 /**
  * The most generic exception class.
  */
-class ORMException(msg: String, cause: Throwable) extends Exception(msg, cause) {
-  def this(msg: String) = this(msg, null)
+case class ORMException(msg: String, cause: Throwable = null) extends Exception(msg, cause) {
   def this(cause: Throwable) = this(null, cause)
 
   /**
