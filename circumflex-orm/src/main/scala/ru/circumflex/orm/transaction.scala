@@ -67,14 +67,27 @@ trait TransactionManager {
   def openTransaction(): Transaction = new Transaction()
 
   /**
-   * A shortcut for `getTransaction.sql(sql)(actions)`.
+   * Execute a block with actions in state-safe manner (does cleanup afterwards) without transaction.
    */
   @throws(classOf[SQLException])
-  def executeOnce[A](action: Connection => A)(errAction: Throwable => A) =
-    getTransaction.executeOnce(action)(errAction)
+  def executeOnce[A](action: Connection => A)(errAction: Throwable => A): A = {
+    var conn: Connection = null
+    try {
+      conn = ORM.connectionProvider.openConnection
+      action(conn)
+    } catch {
+      case e => errAction(e)
+    } finally {
+      if (conn != null) {
+        try {
+          conn.close
+        } catch {case _ =>}
+      }
+    }
+  }
 
   /**
-   * A shortcut for `getTransaction.dml(actions)`.
+   * A shortcut for `getTransaction.execute(actions)`.
    */
   @throws(classOf[SQLException])
   def execute[A](action: Connection => A)(errAction: Throwable => A) =
@@ -127,38 +140,21 @@ object DefaultTransactionManager extends TransactionManager
 class Transaction {
   private val log = Logger.getLogger(this.getClass.getName)
   
-  private var _connectionGotTime: Long = _
-  
   /**
    * Undelying JDBC connection.
    */
   private var _connection: Connection = _
-  def connection = _connection
-  
-  @throws(classOf[SQLException])
-  private def getConnection: Connection = {
-    if (_connection == null || _connection.isClosed) {
+  private def connection = {
+    if (_connection == null) {
       try {
         _connection = ORM.connectionProvider.openConnection
-        _connectionGotTime = System.currentTimeMillis
       } catch {
         case ex => log.log(Level.SEVERE, ex.getMessage, ex); throw ex
       }
     }
     _connection
   }
-
-  /**
-   * Should underlying connection be closed on `commit` or `rollback`?
-   */
-  protected var _isAutoClose = true
-
-  def isAutoClose(): Boolean = _isAutoClose
-  def isAutoClose_=(value: Boolean): this.type = {
-    _isAutoClose = value
-    this
-  }
-
+  
   /**
    * Is underlying connection alive?
    * @Note: According to javadoc: connection.isClosed generally cannot be called to determine whether 
@@ -166,6 +162,18 @@ class Transaction {
    * is invalid by catching any exceptions that might be thrown when an operation is attempted.
    */
   def isLive(): Boolean = _connection != null && !_connection.isClosed
+  
+  /**
+   * Execute an attached block within the transaction scope.
+   */
+  @throws(classOf[SQLException])
+  def execute[A](connAction: Connection => A)(errAction: Throwable => A): A = {
+    try {
+      connAction(connection)
+    } catch {
+      case e => errAction(e)
+    }
+  }
 
   /**
    * Commit the transaction (and close underlying connection if `autoClose` is set to `true`).
@@ -173,7 +181,7 @@ class Transaction {
   @throws(classOf[SQLException])
   def commit() {
     if (isLive && !_connection.getAutoCommit) _connection.commit
-    if (_isAutoClose) close()
+    close()
   }
 
   /**
@@ -183,7 +191,7 @@ class Transaction {
   def rollback() {
     if (isLive && !_connection.getAutoCommit) _connection.rollback
     // @todo invalidate relations cache
-    if (_isAutoClose) close()
+    close()
   }
 
   /**
@@ -193,6 +201,7 @@ class Transaction {
   @throws(classOf[SQLException])
   def close() {
     if (isLive) _connection.close()
+    _connection = null
   }
   
   // ### Database communication methods
@@ -206,36 +215,6 @@ class Transaction {
   // after such manipulation -- that fits perfectly with triggers and other stuff that
   // could possibly affect more data at backend than you intended with any particular
   // query.
-
-  /**
-   * Prepare SQL statement and execute an attached block within the transaction scope.
-   */
-  @throws(classOf[SQLException])
-  def execute[A](connAction: Connection => A)(errAction: Throwable => A): A = {
-    try {
-      val conn = getConnection
-      val ret = connAction(conn)
-      ret
-    } catch {
-      case e => errAction(e)
-    }
-  }
-
-  /**
-   * Execute a block with DML-like actions in state-safe manner (does cleanup afterwards).
-   */
-  @throws(classOf[SQLException])
-  def executeOnce[A](action: Connection => A)(errAction: Throwable => A): A = {
-    try {
-      val conn = getConnection
-      val ret = action(conn)
-      ret
-    } catch {
-      case e => errAction(e)
-    } finally {
-      close
-    }
-  }
 
   // ### Cache  @TODO, use relations inner cache
 

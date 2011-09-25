@@ -2,6 +2,7 @@ package ru.circumflex
 
 
 import ru.circumflex.orm.avro.AvroNode
+import java.sql.Connection
 import java.util.regex.Pattern
 
 // ## ORM package object
@@ -9,6 +10,7 @@ import java.util.regex.Pattern
 package object orm {
   import ru.circumflex.orm.ORM._
 
+  def executeOnce[A](action: Connection => A)(errAction: Throwable => A): A = transactionManager.executeOnce(action)(errAction)
   def tx = transactionManager.getTransaction
   def TX = tx
   def COMMIT() = tx.commit()

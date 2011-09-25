@@ -705,7 +705,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
   }
 
   def exists: Boolean = {
-    tx.executeOnce{conn =>
+    executeOnce{conn =>
       val sql = "select * from " + qualifiedName + " where 1 = 0"
       log.info(sql)
 

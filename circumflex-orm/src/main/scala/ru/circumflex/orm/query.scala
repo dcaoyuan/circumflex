@@ -146,7 +146,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
 
   @throws(classOf[SQLException])
   protected def query[A](postAction: ResultSet => A): A = {
-    tx.executeOnce{conn =>
+    executeOnce{conn =>
       val sql = toSql
       log.info(sql)
 
