@@ -60,24 +60,24 @@ abstract class RelationNode[R] extends SQLable with Cloneable {
 
   // Join shortcuts for different types
 
-  def INNER_JOIN[J <: Record[J]](node: RelationNode[J], on: String): JoinNode[R, J] =
+  def INNER_JOIN[J](node: RelationNode[J], on: String): JoinNode[R, J] =
     JOIN(node, on, INNER)
-  def INNER_JOIN[J <: Record[J]](node: RelationNode[J]): JoinNode[R, J] =
+  def INNER_JOIN[J](node: RelationNode[J]): JoinNode[R, J] =
     JOIN(node, INNER)
 
-  def LEFT_JOIN[J <: Record[J]](node: RelationNode[J], on: String): JoinNode[R, J] =
+  def LEFT_JOIN[J](node: RelationNode[J], on: String): JoinNode[R, J] =
     JOIN(node, on, LEFT)
-  def LEFT_JOIN[J <: Record[J]](node: RelationNode[J]): JoinNode[R, J] =
+  def LEFT_JOIN[J](node: RelationNode[J]): JoinNode[R, J] =
     JOIN(node, LEFT)
 
-  def RIGHT_JOIN[J <: Record[J]](node: RelationNode[J], on: String): JoinNode[R, J] =
+  def RIGHT_JOIN[J](node: RelationNode[J], on: String): JoinNode[R, J] =
     JOIN(node, on, RIGHT)
-  def RIGHT_JOIN[J <: Record[J]](node: RelationNode[J]): JoinNode[R, J] =
+  def RIGHT_JOIN[J](node: RelationNode[J]): JoinNode[R, J] =
     JOIN(node, RIGHT)
 
-  def FULL_JOIN[J <: Record[J]](node: RelationNode[J], on: String): JoinNode[R, J] =
+  def FULL_JOIN[J](node: RelationNode[J], on: String): JoinNode[R, J] =
     JOIN(node, on, FULL)
-  def FULL_JOIN[J <: Record[J]](node: RelationNode[J]): JoinNode[R, J] =
+  def FULL_JOIN[J](node: RelationNode[J]): JoinNode[R, J] =
     JOIN(node, FULL)
 
   // ### Equality and others
