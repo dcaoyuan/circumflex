@@ -6,18 +6,16 @@ package ru.circumflex.orm
  * *Record* is a cornerstone of relational model. In general, each instance of
  * pesistent class is stored as a single record in a relation corresponding to that
  * class. Since Circumflex ORM employs the Active Relation design approach to
- * persistence, each persistent class should subclass `Record`.
+ * persistence, each persistent class could be wrapped as a `Record` which has a 
+ * Long id.
+ * 
+ * @param id  
+ *          We only support auto-generated `BIGINT` columns as primary keys
+ *          for a couple of reasons. Sorry.
+ * @param value
+ *          the value instance that this record wrap
  */
-abstract class Record[R <: Record[R]] { this: R =>
-
-  // ### Commons
-
-  /**
-   * Unique identifier based on fully-qualified class name of
-   * this record, which is used to uniquely identify this record
-   * class among others.
-   */
-  val uuid = getClass.getName
+case class Record[R <: AnyRef](id: Long, value: R) { 
 
   /**
    * A `Relation[R]` corresponding to this record.
@@ -33,7 +31,7 @@ abstract class Record[R <: Record[R]] { this: R =>
    * However, if you prefer different naming conventions, you should override
    * this method.
    */
-  def relation = RelationRegistry.getRelation(this)
+  def relation: Relation[R] = RelationRegistry.getRelation(value)
 
   /**
    * We only support auto-generated `BIGINT` columns as primary keys
