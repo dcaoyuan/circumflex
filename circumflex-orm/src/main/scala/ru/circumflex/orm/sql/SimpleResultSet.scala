@@ -56,21 +56,21 @@ object SimpleResultSet {
    * A simple array implementation,
    * backed by an object array
    */
-  class SimpleArray(value: Array[Object]) extends java.sql.Array {
+  class SimpleArray(value: Array[AnyRef]) extends java.sql.Array {
 
     /**
      * Get the object array.
      *
      * @return the object array
      */
-    def getArray: Object = {
+    def getArray: AnyRef = {
       value
     }
 
     /**
      * INTERNAL
      */
-    def getArray(map: java.util.Map[String, Class[_]]): Object = {
+    def getArray(map: java.util.Map[String, Class[_]]): AnyRef = {
       throw DbException.getUnsupportedException
     }
 
@@ -78,7 +78,7 @@ object SimpleResultSet {
      * INTERNAL
      */
     @throws(classOf[SQLException])
-    def getArray(index: Long, count: Int): Object = {
+    def getArray(index: Long, count: Int): AnyRef = {
       throw DbException.getUnsupportedException
     }
 
@@ -86,7 +86,7 @@ object SimpleResultSet {
      * INTERNAL
      */
     @throws(classOf[SQLException])
-    def getArray(index: Long, count: Int, map: java.util.Map[String, Class[_]]): Object = {
+    def getArray(index: Long, count: Int, map: java.util.Map[String, Class[_]]): AnyRef = {
       throw DbException.getUnsupportedException
     }
 
@@ -442,6 +442,18 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
   }
 
   /**
+   * Returns the value as an Object of type T.
+   *
+   * @param columnIndex (1,2,...)
+   * @param tpe
+   * @return the value
+   */
+  @throws(classOf[SQLException])
+  def getObject[T](columnIndex: Int, tpe: Class[T]): T = {
+    get(columnIndex).asInstanceOf[T]
+  }
+
+  /**
    * Returns the value as a String.
    *
    * @param columnIndex (1,2,...)
@@ -649,7 +661,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    */
   @throws(classOf[SQLException])
   def getArray(columnIndex: Int): java.sql.Array = {
-    new SimpleArray(get(columnIndex).asInstanceOf[Array[Object]])
+    new SimpleArray(get(columnIndex).asInstanceOf[Array[AnyRef]])
   }
 
   /**
@@ -659,8 +671,20 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
    * @return the value
    */
   @throws(classOf[SQLException])
-  def getObject(columnLabel: String): Object = {
+  def getObject(columnLabel: String): AnyRef = {
     getObject(findColumn(columnLabel))
+  }
+
+  /**
+   * Returns the value as an Object of type tpe.
+   *
+   * @param columnLabel the column label
+   * @param tpe
+   * @return the value
+   */
+  @throws(classOf[SQLException])
+  def getObject[T](columnLabel: String, tpe: Class[T]): T = {
+    getObject(findColumn(columnLabel), tpe)
   }
 
   /**
@@ -1732,7 +1756,7 @@ class SimpleResultSet(private var source: SimpleRowSource) extends ResultSet wit
     _wasNull = o == null
     o
   }
-
+  
   @throws(classOf[SQLException])
   private def getColumn(i: Int): Column = {
     checkColumnIndex(i)
