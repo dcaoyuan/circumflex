@@ -235,6 +235,6 @@ object DDLUnit {
     def body: String
     def sql: String
   }
-  case class InfoMsg(val body: String, val sql: String) extends Msg
-  case class ErrorMsg(val body: String, val sql: String) extends Msg
+  final case class InfoMsg(val body: String, val sql: String) extends Msg
+  final case class ErrorMsg(val body: String, val sql: String) extends Msg
 }

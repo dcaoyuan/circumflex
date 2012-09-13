@@ -15,7 +15,7 @@ package ru.circumflex.orm
  * @param value
  *          the value instance that this record wrap
  */
-case class Record[R <: AnyRef](id: Long, value: R) { 
+final case class Record[R <: AnyRef](id: Long, value: R) { 
 
   /**
    * A `Relation[R]` corresponding to this record.

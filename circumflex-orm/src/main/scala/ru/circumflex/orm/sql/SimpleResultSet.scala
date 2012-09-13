@@ -50,7 +50,7 @@ object SimpleResultSet {
   /**
    * This class holds the data of a result column.
    */
-  case class Column (name: String, sqlType: Int, precision: Int, scale: Int)
+  final case class Column (name: String, sqlType: Int, precision: Int, scale: Int)
 
   /**
    * A simple array implementation,

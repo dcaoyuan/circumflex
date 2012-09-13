@@ -185,7 +185,7 @@ class UntypedTupleProjection(override val subProjections: Projection[_]*) extend
   def read(rs: ResultSet): Array[Any] = subProjections.map(_.read(rs)).toArray
 }
 
-case class Tuple2Projection[T1, T2] (
+final case class Tuple2Projection[T1, T2] (
   val _1: Projection[T1],
   val _2: Projection[T2]
 ) extends CompositeProjection[Tuple2[T1, T2]] {
@@ -195,7 +195,7 @@ case class Tuple2Projection[T1, T2] (
     (_1.read(rs), _2.read(rs))
 }
 
-case class Tuple3Projection[T1, T2, T3] (
+final case class Tuple3Projection[T1, T2, T3] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3]
@@ -206,7 +206,7 @@ case class Tuple3Projection[T1, T2, T3] (
     (_1.read(rs), _2.read(rs), _3.read(rs))
 }
 
-case class Tuple4Projection[T1, T2, T3, T4] (
+final case class Tuple4Projection[T1, T2, T3, T4] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
@@ -218,7 +218,7 @@ case class Tuple4Projection[T1, T2, T3, T4] (
     (_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs))
 }
 
-case class Tuple5Projection[T1, T2, T3, T4, T5] (
+final case class Tuple5Projection[T1, T2, T3, T4, T5] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
@@ -231,7 +231,7 @@ case class Tuple5Projection[T1, T2, T3, T4, T5] (
     (_1.read(rs), _2.read(rs), _3.read(rs), _4.read(rs), _5.read(rs))
 }
 
-case class Tuple6Projection[T1, T2, T3, T4, T5, T6] (
+final case class Tuple6Projection[T1, T2, T3, T4, T5, T6] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
@@ -246,7 +246,7 @@ case class Tuple6Projection[T1, T2, T3, T4, T5, T6] (
      _6.read(rs))
 }
 
-case class Tuple7Projection[T1, T2, T3, T4, T5, T6, T7] (
+final case class Tuple7Projection[T1, T2, T3, T4, T5, T6, T7] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
@@ -262,7 +262,7 @@ case class Tuple7Projection[T1, T2, T3, T4, T5, T6, T7] (
      _6.read(rs), _7.read(rs))
 }
 
-case class Tuple8Projection[T1, T2, T3, T4, T5, T6, T7, T8] (
+final case class Tuple8Projection[T1, T2, T3, T4, T5, T6, T7, T8] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
@@ -279,7 +279,7 @@ case class Tuple8Projection[T1, T2, T3, T4, T5, T6, T7, T8] (
      _6.read(rs), _7.read(rs), _8.read(rs))
 }
 
-case class Tuple9Projection[T1, T2, T3, T4, T5, T6, T7, T8, T9] (
+final case class Tuple9Projection[T1, T2, T3, T4, T5, T6, T7, T8, T9] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
@@ -297,7 +297,7 @@ case class Tuple9Projection[T1, T2, T3, T4, T5, T6, T7, T8, T9] (
      _6.read(rs), _7.read(rs), _8.read(rs), _9.read(rs))
 }
 
-case class Tuple10Projection[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10] (
+final case class Tuple10Projection[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10] (
   val _1: Projection[T1],
   val _2: Projection[T2],
   val _3: Projection[T3],
