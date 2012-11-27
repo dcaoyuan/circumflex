@@ -199,7 +199,7 @@ class TimeField[R](relation: Relation[R], name: String
 
 class XmlField[R](relation: Relation[R], name: String
 ) extends XmlSerializableField[R, NodeSeq](relation, name, ORM.dialect.xmlType, AvroSchema.Type.STRING) {
-  def fromXml(str: String): NodeSeq = try XML.loadString(str) catch {case _ => null}
+  def fromXml(str: String): NodeSeq = try XML.loadString(str) catch {case _: Throwable => null}
   override def read(rs: ResultSet, alias: String) = Option(fromXml(rs.getString(alias)))
 }
 
@@ -226,8 +226,8 @@ class AutoPrimaryKeyField[R](relation: Relation[R]
   override def getValue(from: R): Long = {
     _getValue(from) match {
       case null => relation.idOf(from).getOrElse(-1)
-      case value: Long => value
-        relation.updateCache(value.asInstanceOf[Long], from)
+      case value: Long => 
+        relation.updateCache(value, from)
         value
     }
   }

@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import net.lag.logging.Logger
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 
@@ -32,7 +31,7 @@ trait ParameterizedExpression extends SQLable {
 
   override def equals(that: Any) = that match {
     case e: ParameterizedExpression =>
-      e.toSql == this.toSql && (e.parameters.toList -- this.parameters.toList) == Nil
+      e.toSql == this.toSql && e.parameters.toList == this.parameters.toList
     case _ => false
   }
 
@@ -247,11 +246,11 @@ case class ORMException(msg: String, cause: Throwable = null) extends Exception(
 /**
  * A very simple model for operating with structural data.
  */
-trait HashModel {
-  def get(key: String): Option[Any]
+trait HashModel[A] {
+  def get(key: String): Option[A]
   def apply(key: String): Any = get(key).get
-  def getOrElse[A](key: String, default: =>A): A = get(key) match {
-    case Some(value: A) => value;
+  def getOrElse(key: String, default: => A): A = get(key) match {
+    case Some(value) => value
     case _ => default
   }
 }

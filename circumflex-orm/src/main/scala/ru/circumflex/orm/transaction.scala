@@ -76,12 +76,12 @@ trait TransactionManager {
       conn = ORM.connectionProvider.openConnection
       action(conn)
     } catch {
-      case e => errAction(e)
+      case e: Throwable => errAction(e)
     } finally {
       if (conn != null) {
         try {
           conn.close
-        } catch {case _ =>}
+        } catch {case _: Throwable =>}
       }
     }
   }
@@ -114,7 +114,7 @@ trait TransactionManager {
         log.fine("Committed current transaction.")
       }
     } catch {
-      case e =>
+      case e: Throwable =>
         if (transaction.isLive) {
           transaction.rollback
           log.warning("Rolled back current transaction.")
@@ -149,7 +149,7 @@ class Transaction {
       try {
         _connection = ORM.connectionProvider.openConnection
       } catch {
-        case ex => log.log(Level.SEVERE, ex.getMessage, ex); throw ex
+        case ex: Throwable => log.log(Level.SEVERE, ex.getMessage, ex); throw ex
       }
     }
     _connection
@@ -171,7 +171,7 @@ class Transaction {
     try {
       connAction(connection)
     } catch {
-      case e => errAction(e)
+      case e: Throwable => errAction(e)
     }
   }
 

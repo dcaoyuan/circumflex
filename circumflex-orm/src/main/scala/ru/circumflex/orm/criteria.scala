@@ -102,17 +102,17 @@ class Criteria[R](val rootNode: RelationNode[R]) extends SQLable with Cloneable 
         val pNode = x.left
         val cNode = x.right
         val a = x.association
-        val pIndex = _projections.findIndexOf(p => p.node.alias == pNode.alias)
-        val cIndex = _projections.findIndexOf(p => p.node.alias == cNode.alias)
+        val pIndex = _projections.indexWhere(_.node.alias == pNode.alias)
+        val cIndex = _projections.indexWhere(_.node.alias == cNode.alias)
         if (pIndex == -1 || cIndex == -1) return
         val parent = tuple(pIndex).asInstanceOf[P]
-        val child = tuple(cIndex).asInstanceOf[C]
-        if (parent != null) {
+        val child  = tuple(cIndex).asInstanceOf[C]
+        if (null != parent) {
           var children = tx.getCachedInverse(parent, a) match {
             case null => Nil
             case l: Seq[C] => l
           }
-          if (child != null && !children.contains(child))
+          if (null != child && !children.contains(child))
             children ++= List(child)
           tx.updateInverseCache(parent, a, children)
         }

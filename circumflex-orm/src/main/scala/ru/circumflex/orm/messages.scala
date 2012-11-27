@@ -4,13 +4,13 @@ package ru.circumflex.orm
 import java.util.{Locale, ResourceBundle}
 import net.lag.logging.Logger
 
-class Messages(val baseName: String, val locale: Locale) extends HashModel {
+class Messages(val baseName: String, val locale: Locale) extends HashModel[String] {
   private val logger = Logger.get(this.getClass.getName)
   
   val msgBundle: ResourceBundle = try {
     ResourceBundle.getBundle(baseName, locale)
   } catch {
-    case e => {
+    case e: Throwable => {
         logger.debug("ResourceBundle for messages instance not found: " + baseName)
       null
     }
@@ -18,7 +18,7 @@ class Messages(val baseName: String, val locale: Locale) extends HashModel {
   def get(key: String): Option[String] = try {
     Option(msgBundle.getString(key))
   } catch {
-    case e => None
+    case e: Throwable => None
   }
   def get(key: String, params: Pair[String, String]*): Option[String] = get(key, Map(params: _*))
   def get(key: String, params: Map[String, String]): Option[String] =

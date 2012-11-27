@@ -72,6 +72,7 @@ object AvroReader {
           val field = fields.next
           schemaFields += ((field.name, field))
         }
+      case _ =>
     }
     schemaFields
   }

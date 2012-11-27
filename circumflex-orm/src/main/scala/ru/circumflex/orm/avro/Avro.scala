@@ -72,6 +72,7 @@ object Avro {
       case Type.BYTES =>   Types.VARBINARY
       case Type.STRING =>  Types.VARCHAR
       case Type.BOOLEAN => Types.BOOLEAN
+      case x => throw new Exception("Unknown scheme type: " + x)
     }
   }
 
@@ -85,6 +86,7 @@ object Avro {
       case Types.BIGINT    => Type.LONG
       case Types.FLOAT  | Types.REAL    => Type.FLOAT
       case Types.DOUBLE | Types.DECIMAL => Type.DOUBLE
+      case x => throw new Exception("Unknown sql type: " + x)
     }
   }
 
@@ -237,7 +239,7 @@ class Avro private () extends SimpleRowSource {
         close
         rs.close
       } catch {
-        case _ =>
+        case _: Throwable =>
       }
     }
   }
@@ -333,6 +335,7 @@ class Avro private () extends SimpleRowSource {
           val field = fields.next
           schemaFields += (field.name -> field)
         }
+      case _ =>
     }
   }
 
@@ -377,7 +380,7 @@ class Avro private () extends SimpleRowSource {
       try {
         reader.close
       } catch {
-        case _ => 
+        case _: Throwable => 
       }
     reader = null
 
@@ -385,7 +388,7 @@ class Avro private () extends SimpleRowSource {
       try {
         writer.close
       } catch {
-        case _ =>
+        case _: Throwable =>
       }
     writer = null
   }

@@ -35,7 +35,7 @@ class Deployment(val id: String,
     entries.foreach(e => processNode(e, Nil))
     tx.commit
   } catch {
-    case e =>
+    case e: Throwable =>
       tx.rollback
       throw e
   }
@@ -49,11 +49,11 @@ class Deployment(val id: String,
     if (node.attributes.next != null) {
       val crit = prepareCriteria(r, node)
       crit.unique match {
-        case Some(rec: R) if (onExist == Deployment.Skip || node.child.size == 0) =>
+        case Some(rec) if (onExist == Deployment.Skip || node.child.size == 0) =>
           return rec
-        case Some(rec: R) if (onExist == Deployment.Recreate) =>
+        case Some(rec) if (onExist == Deployment.Recreate) =>
           crit.mkDelete.execute()
-        case Some(rec: R) if (onExist == Deployment.Update) =>
+        case Some(rec) if (onExist == Deployment.Update) =>
           r = rec
         case _ =>
       }
@@ -130,7 +130,7 @@ class Deployment(val id: String,
   protected def convertValue(r: Any, k: String, v: String): Any = try {
     r.asInstanceOf[AnyRef].getClass.getMethod(k).invoke(r).asInstanceOf[XmlSerializable[Any]].fromXml(v)
   } catch {
-    case _ => v
+    case _: Throwable => v
   }
 
   override def toString = id match {

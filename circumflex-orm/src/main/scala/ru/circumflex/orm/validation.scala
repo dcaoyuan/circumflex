@@ -39,27 +39,31 @@ class RecordValidator[R](relation: Relation[R]) {
   def validators = _validators
   def validate(record: R): Seq[ValidationError] =
     _validators.flatMap(_.apply(record)).toList.removeDuplicates
+  
   def add(validator: R => Option[ValidationError]): this.type = {
     _validators ++= List(validator)
     this
   }
+  
   def notNull(field: Field[R, _]): this.type =
     add(r => relation.fields.find(f => f == field) match {
         case Some(f: Field[R, _]) =>
           if (f.null_?(r)) Some(new ValidationError(f.uuid, "null"))
           else None
-        case None =>
+        case _ =>
           throw new ORMException("Field " + field + " does not correspond to record " + r)
       })
+  
   def notEmpty(field: TextField[R]): this.type =
     add(r => relation.fields.find(f => f == field) match {
         case Some(f: TextField[R]) =>
           if (f.getValue(r) == null) Some(new ValidationError(f.uuid, "null"))
           else if (f.getValue(r).trim == "") Some(new ValidationError(f.uuid, "empty"))
           else None
-        case None =>
+        case _ =>
           throw new ORMException("Field " + field + " does not correspond to record " + r)
       })
+  
   def pattern(field: TextField[R], regex: String, key: String = "pattern"): this.type =
     add(r => relation.fields.find(f => f == field) match {
         case Some(f: TextField[R]) =>
@@ -67,7 +71,7 @@ class RecordValidator[R](relation: Relation[R]) {
           else if (!f.getValue(r).matches(regex))
             Some(new ValidationError(f.uuid, key, "regex" -> regex, "value" -> f.getValue(r)))
           else None
-        case None =>
+        case _ =>
           throw new ORMException("Field " + field + " does not correspond to record " + r)
       })
 }
