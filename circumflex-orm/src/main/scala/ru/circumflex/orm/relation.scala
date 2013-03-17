@@ -9,6 +9,7 @@ import java.lang.reflect.Method
 import java.sql.PreparedStatement
 import java.sql.SQLException
 import scala.collection.mutable
+import scala.reflect._
 
 // ## Relations registry
 
@@ -35,7 +36,7 @@ object RelationRegistry {
 
 // ## Relation
 
-abstract class Relation[R](implicit m: Manifest[R]) {
+abstract class Relation[R : ClassTag] {
   private val log = Logger.getLogger(this.getClass.getName)
   
   protected var _initialized = false
@@ -58,7 +59,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
    * e.g. strip trailing `$` from `this.getClass.getName`.
    * getClass.getName.replaceAll("\\$(?=\\Z)", "")
    */
-  val recordClass: Class[R] = Config.loadClass[R](m.erasure.getName)
+  val recordClass: Class[R] = Config.loadClass[R](classTag[R].runtimeClass.getName)
 
   private val recordSample: R = recordClass.newInstance
   private val recordFields: List[ClassVar[R, _]] = ClassVar.getPublicVars(recordClass)
@@ -717,7 +718,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
         st.close
         true
       } catch {
-        case _ => false
+        case _: Throwable => false
       }
       
       ret
@@ -737,7 +738,7 @@ abstract class Relation[R](implicit m: Manifest[R]) {
 
 // ## Table
 
-abstract class Table[R: Manifest] extends Relation[R] with SchemaObject {
+abstract class Table[R: ClassTag] extends Relation[R] with SchemaObject {
   val objectName = "TABLE " + qualifiedName
   
   def sqlDrop = {
@@ -753,7 +754,7 @@ abstract class Table[R: Manifest] extends Relation[R] with SchemaObject {
 
 // ## View
 
-abstract class View[R: Manifest] extends Relation[R] with SchemaObject {
+abstract class View[R: ClassTag] extends Relation[R] with SchemaObject {
 
   // ### Miscellaneous
 
