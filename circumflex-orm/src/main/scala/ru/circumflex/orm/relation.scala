@@ -36,7 +36,7 @@ object RelationRegistry {
 
 // ## Relation
 
-abstract class Relation[R : ClassTag] {
+abstract class Relation[R : ClassTag](_relationName: String = null) {
   private val log = Logger.getLogger(this.getClass.getName)
   
   protected var _initialized = false
@@ -84,11 +84,11 @@ abstract class Relation[R : ClassTag] {
    * Relation name defaults to record's unqualified class name, transformed
    * with `camelCaseToUnderscore`.
    */
-  val relationName = {
+  val relationName = if (_relationName == null) {
     val clzName = getClass.getSimpleName
     val normalName = clzName.substring(0, clzName.length - 1) // strip ending '$'
     camelCaseToUnderscore(normalName)
-  }
+  } else _relationName
 
   /**
    * Schema is used to produce a qualified name for relation.
@@ -738,7 +738,7 @@ abstract class Relation[R : ClassTag] {
 
 // ## Table
 
-abstract class Table[R: ClassTag] extends Relation[R] with SchemaObject {
+abstract class Table[R: ClassTag](_relationName: String = null) extends Relation[R](_relationName) with SchemaObject {
   val objectName = "TABLE " + qualifiedName
   
   def sqlDrop = {
@@ -754,7 +754,7 @@ abstract class Table[R: ClassTag] extends Relation[R] with SchemaObject {
 
 // ## View
 
-abstract class View[R: ClassTag] extends Relation[R] with SchemaObject {
+abstract class View[R: ClassTag] extends Relation[R](null) with SchemaObject {
 
   // ### Miscellaneous
 
