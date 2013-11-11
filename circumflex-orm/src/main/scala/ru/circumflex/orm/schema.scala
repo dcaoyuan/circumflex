@@ -159,6 +159,7 @@ class DefinitionHelper[R](relation: Relation[R], name: String) {
   def FLOAT(precision: Int = -1, scale: Int = 1) = new FloatField[R](relation, name, precision, scale)
   def DOUBLE(precision: Int = -1, scale: Int = 1) = new DoubleField[R](relation, name, precision, scale)
   def NUMERIC(precision: Int = -1, scale: Int = 1) = new NumericField[R](relation, name, precision, scale)
+  def DECIMAL(precision: Int = -1, scale: Int = 1) = new DecimalField[R](relation, name, precision, scale)
   def TEXT() = new TextField[R](relation, name, ORM.dialect.textType)
   def VARCHAR(length: Int = -1) = new TextField[R](relation, name, length)
   def VARBINARY(length: Int = -1) = new VarbinaryField[R](relation, name, length)

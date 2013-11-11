@@ -32,6 +32,7 @@ class Dialect {
   def floatType  (precision: Int = -1, scale: Int = 0) = "FLOAT"   + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
   def doubleType (precision: Int = -1, scale: Int = 0) = "DOUBLE"  + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
   def numericType(precision: Int = -1, scale: Int = 0) = "NUMERIC" + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
+  def decimalType(precision: Int = -1, scale: Int = 0) = "DECIMAL" + (if (precision == -1) "" else "(" + precision + "," + scale + ")")
   def textType = "TEXT"
   def varcharType  (length: Int = -1) = "VARCHAR"   + (if (length == -1) "" else "(" + length + ")")
   def varbinaryType(length: Int = -1) = "VARBINARY" + (if (length == -1) "" else "(" + length + ")")

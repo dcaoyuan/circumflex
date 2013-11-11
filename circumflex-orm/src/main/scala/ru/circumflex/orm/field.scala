@@ -107,7 +107,7 @@ class Field[R, T](val relation: Relation[R],
           x.set(to, value.asInstanceOf[T])
         } catch {
           case e: Exception => 
-            val ex = new RuntimeException("Error of setter, requires " + x.setter.getParameterTypes + ", given is " + value + ": "+ e.getMessage)
+            val ex = new RuntimeException("Error of setter, requires " + x.setter.getParameterTypes.apply(0) + ", given is " + value + "(" +  value.asInstanceOf[T].getClass + "): "+ e.getMessage)
             ex.initCause(Option(e.getCause) getOrElse e)
             throw ex
         }
@@ -159,6 +159,16 @@ class DoubleField[R](relation: Relation[R], name: String, precision: Int = -1, s
 
 class NumericField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
 ) extends XmlSerializableField[R, Double](relation, name, ORM.dialect.numericType(precision, scale), AvroSchema.Type.DOUBLE) {
+  def fromXml(string: String) = string.toDouble
+}
+
+/**
+ * @Note although the field is mapped to scala.math.BigDecimal, to declare this kind of
+ * field in Table, should use java.math.BigDecimal, which is the type from jdbc.
+ * @Todo Don't know why 
+ */
+class DecimalField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
+) extends XmlSerializableField[R, BigDecimal](relation, name, ORM.dialect.decimalType(precision, scale), AvroSchema.Type.DOUBLE) {
   def fromXml(string: String) = string.toDouble
 }
 
