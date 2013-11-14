@@ -10,6 +10,7 @@ import java.sql.ResultSet
 import java.util.Date
 import org.aiotrade.lib.util.ClassVar
 import org.apache.avro.{Schema => AvroSchema}
+import scala.reflect.ClassTag
 import scala.xml.NodeSeq
 import scala.xml.XML
 
@@ -18,10 +19,10 @@ import scala.xml.XML
  * R: type Of Record
  * T: type of field value
  */
-class Field[R, T](val relation: Relation[R],
-                  val name: String,
-                  val sqlType: String,
-                  val avroType: AvroSchema.Type
+class Field[R, T: ClassTag](val relation: Relation[R],
+                            val name: String,
+                            val sqlType: String,
+                            val avroType: AvroSchema.Type
 ) extends SQLable {
 
   val uuid = relation.uuid + "." + name
@@ -87,12 +88,12 @@ class Field[R, T](val relation: Relation[R],
    */
   protected[orm] def _getValue(from: R): Any = {
     recField match {
-      case Some(x) =>
+      case Some(field) =>
         try {
-          x.get(from)
+          field.get(from)
         } catch {
           case e: Exception => 
-            val ex = new RuntimeException("Error of getter " + x.getter + ": " + e.getMessage)
+            val ex = new RuntimeException("Error when get field '" + field.name + "': " + e.getMessage)
             ex.initCause(Option(e.getCause) getOrElse e)
             throw ex
         }
@@ -102,12 +103,20 @@ class Field[R, T](val relation: Relation[R],
 
   protected[orm] def _setValue(to: R, value: Any) {
     recField match {
-      case Some(x) =>
+      case Some(field) =>
         try {
-          x.set(to, value.asInstanceOf[T])
+          if (value == null) {
+            field.set(to, valueWhenNull)
+          } else {
+            field.set(to, value.asInstanceOf[T])
+          }
         } catch {
           case e: Exception => 
-            val ex = new RuntimeException("Error of setter, requires " + x.setter.getParameterTypes.apply(0) + ", given is " + value + "(" +  value.asInstanceOf[T].getClass + "): "+ e.getMessage)
+            val ex = if (value != null) {
+              new RuntimeException("Error when set field '" + field.name + "', requires " + field.setter.getParameterTypes.apply(0) + ", given is " + value + "(" +  value.asInstanceOf[T].getClass + "): "+ e.getMessage)
+            } else {
+              new RuntimeException("Error when set field '" + field.name + "', requires " + field.setter.getParameterTypes.apply(0) + ", given is null: "+ e.getMessage)
+            }
             ex.initCause(Option(e.getCause) getOrElse e)
             throw ex
         }
@@ -115,7 +124,10 @@ class Field[R, T](val relation: Relation[R],
     }
   }
 
-  override def toString = name
+  private val valueWhenNull = reflect.classTag[T].newArray(1).apply(0)
+  
+  override 
+  def toString = name
 }
 
 trait AutoIncrementable[R, T] extends Field[R, T] {
@@ -127,7 +139,7 @@ trait AutoIncrementable[R, T] extends Field[R, T] {
   }
 }
 
-abstract class XmlSerializableField[R, T](relation: Relation[R], name: String, sqlType: String, avroType: AvroSchema.Type
+abstract class XmlSerializableField[R, T: ClassTag](relation: Relation[R], name: String, sqlType: String, avroType: AvroSchema.Type
 ) extends Field[R, T](relation, name, sqlType, avroType) with XmlSerializable[T] {
   def toXml(value: T) = value.toString
 }
@@ -158,7 +170,7 @@ class DoubleField[R](relation: Relation[R], name: String, precision: Int = -1, s
 }
 
 class NumericField[R](relation: Relation[R], name: String, precision: Int = -1, scale: Int = 0
-) extends XmlSerializableField[R, Double](relation, name, ORM.dialect.numericType(precision, scale), AvroSchema.Type.DOUBLE) {
+) extends XmlSerializableField[R, BigDecimal](relation, name, ORM.dialect.numericType(precision, scale), AvroSchema.Type.DOUBLE) {
   def fromXml(string: String) = string.toDouble
 }
 
@@ -217,7 +229,8 @@ class AutoPrimaryKeyField[R](relation: Relation[R]
 ) extends LongField(relation, "id") {
   _autoIncrement = true
 
-  override def defaultExpression = Some(ORM.dialect.defaultExpression(this))
+  override 
+  def defaultExpression = Some(ORM.dialect.defaultExpression(this))
 
   /**
    * @Note:
@@ -231,9 +244,11 @@ class AutoPrimaryKeyField[R](relation: Relation[R]
    ^
    res2: Boolean = false
    */
-  override def empty_?(record: R): Boolean = getValue(record) == -1
+  override 
+  def empty_?(record: R): Boolean = getValue(record) == -1
 
-  override def getValue(from: R): Long = {
+  override 
+  def getValue(from: R): Long = {
     _getValue(from) match {
       case null => relation.idOf(from).getOrElse(-1)
       case value: Long => 
@@ -242,7 +257,8 @@ class AutoPrimaryKeyField[R](relation: Relation[R]
     }
   }
 
-  override def setValue(to: R, value: Any): Option[() => Unit] = {
+  override 
+  def setValue(to: R, value: Any): Option[() => Unit] = {
     _setValue(to, value)
     relation.updateCache(value.asInstanceOf[Long], to)
     None
@@ -259,12 +275,14 @@ class AutoPrimaryKeyField[R](relation: Relation[R]
 class SerializedField[R, O](relation: Relation[R], name: String, tpe: Class[O], length: Int = -1
 ) extends Field[R, Array[Byte]](relation, name, ORM.dialect.varbinaryType(length), AvroSchema.Type.BYTES) {
 
-  override def getValue(from: R): Array[Byte] = {
+  override 
+  def getValue(from: R): Array[Byte] = {
     val trueValue = _getValue(from).asInstanceOf[O]
     encodeValue(trueValue)
   }
 
-  override def setValue(to: R, value: Any) = {
+  override 
+  def setValue(to: R, value: Any) = {
     val bytes = value match {
       case null => null
       case x: ByteBuffer => x.array
