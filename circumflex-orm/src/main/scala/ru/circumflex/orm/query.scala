@@ -14,7 +14,7 @@ import ru.circumflex.orm.avro.AvroNode
  * The most common contract for queries.
  */
 trait Query extends SQLable with ParameterizedExpression with Cloneable {
-  protected val log = Logger.getLogger(this.getClass.getName)
+  private val log = Logger.getLogger(this.getClass.getName)
   
   protected var aliasCounter = 0
 
@@ -83,7 +83,8 @@ trait Query extends SQLable with ParameterizedExpression with Cloneable {
  * will be rendered in `SELECT` clause and will be used to read `ResultSet`.
  */
 abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
-
+	private val log = Logger.getLogger(this.getClass.getName)
+	
   ensureProjectionAlias(projection)
 
   /**
@@ -396,7 +397,8 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
  * A conrtact for DML queries (data-manipulation).
  */
 trait DMLQuery extends Query {
-
+  private val log = Logger.getLogger(this.getClass.getName)
+	
   /**
    * Execute a query and return the number of affected rows.
    */

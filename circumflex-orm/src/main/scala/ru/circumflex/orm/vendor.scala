@@ -1,10 +1,14 @@
 package ru.circumflex.orm
 
+import java.util.logging.Logger
+
 class PostgreSQLDialect extends Dialect {
   override def timestampType = "TIMESTAMPTZ"
 }
 
 class MySQLDialect extends Dialect {
+	private val log = Logger.getLogger(this.getClass.getName)
+	
   override def textType = "VARCHAR(4096)"
   override def timestampType = "TIMESTAMP"
   override def supportsSchema_?(): Boolean = false
