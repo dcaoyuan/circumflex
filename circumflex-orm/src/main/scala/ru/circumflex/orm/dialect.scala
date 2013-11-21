@@ -22,7 +22,7 @@ object DefaultDialect extends Dialect
  *   [psql]: http://postgresql.org
  */
 class Dialect {
-  protected val log = Logger.getLogger(this.getClass.getName)
+  private val log = Logger.getLogger(this.getClass.getName)
   
   // ### SQL types
 
