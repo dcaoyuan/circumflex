@@ -11,8 +11,6 @@ package ru.circumflex.orm
  * configuration parameter accordingly.
  */
 
-import java.util.logging.Logger
-
 object DefaultDialect extends Dialect
 
 /**
@@ -22,7 +20,6 @@ object DefaultDialect extends Dialect
  *   [psql]: http://postgresql.org
  */
 class Dialect {
-  private val log = Logger.getLogger(this.getClass.getName)
   
   // ### SQL types
 

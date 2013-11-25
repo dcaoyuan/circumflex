@@ -1,13 +1,11 @@
 package ru.circumflex.orm
 
 import java.sql.Statement
-import java.util.logging.Logger
-import org.aiotrade.lib.collection.WeakIdentityBiHashMap
-import org.aiotrade.lib.util.ClassVar
-import org.aiotrade.lib.util.config.Config
 import java.lang.reflect.Method
 import java.sql.PreparedStatement
 import java.sql.SQLException
+import org.aiotrade.lib.collection.WeakIdentityBiHashMap
+import org.aiotrade.lib.util.ClassVar
 import scala.collection.mutable
 import scala.reflect._
 
@@ -26,7 +24,7 @@ object RelationRegistry {
     classToRelation.get(r.asInstanceOf[AnyRef].getClass) match {
       case Some(rel: Relation[R]) => rel
       case _ => 
-        val relClass = Config.loadClass[Relation[R]](r.asInstanceOf[AnyRef].getClass.getName + "$")
+        val relClass = ORM.loadClass[Relation[R]](r.asInstanceOf[AnyRef].getClass.getName + "$")
         val relation = relClass.getField("MODULE$").get(null).asInstanceOf[Relation[R]]
         classToRelation += (r.asInstanceOf[AnyRef].getClass -> relation)
         relation
@@ -37,7 +35,7 @@ object RelationRegistry {
 // ## Relation
 
 abstract class Relation[R : ClassTag](_relationName: String = null) {
-  private val log = Logger.getLogger(this.getClass.getName)
+  private lazy val log = ORM.getLogger(this)
   
   protected var _initialized = false
   
@@ -59,7 +57,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
    * e.g. strip trailing `$` from `this.getClass.getName`.
    * getClass.getName.replaceAll("\\$(?=\\Z)", "")
    */
-  val recordClass: Class[R] = Config.loadClass[R](classTag[R].runtimeClass.getName)
+  val recordClass: Class[R] = ORM.loadClass[R](classTag[R].runtimeClass.getName)
 
   private val recordSample: R = recordClass.newInstance
   private val recordFields: List[ClassVar[R, _]] = ClassVar.getPublicVars(recordClass)

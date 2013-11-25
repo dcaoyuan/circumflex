@@ -1,11 +1,12 @@
 package ru.circumflex.orm
 
+import akka.actor.ActorSystem
+import akka.event.Logging
+import com.typesafe.config.ConfigFactory
 import java.sql.{Timestamp, PreparedStatement, ResultSet, Connection, SQLException}
 import java.util.Date
-import java.util.logging.Logger
 import javax.naming.InitialContext
 import javax.sql.DataSource
-import org.aiotrade.lib.util.config.Config
 import org.apache.tomcat.jdbc.pool.PoolProperties
 
 // ## Configuration
@@ -16,7 +17,17 @@ import org.apache.tomcat.jdbc.pool.PoolProperties
  */
 object ORM {
 
-  val config = Config()
+  val config = ConfigFactory.load()
+
+	/**
+	 * You should assign an actorSystem as soon as possible
+	 */
+	var actorSystem: ActorSystem = _
+	def getLogger(o: AnyRef) = Logging.getLogger(actorSystem, o)
+
+	def classLoader: ClassLoader = Thread.currentThread.getContextClassLoader
+
+  def loadClass[C](name: String): Class[C] = Class.forName(name, true, classLoader).asInstanceOf[Class[C]]
 
   // ### Global Configuration Objects
 
@@ -24,45 +35,42 @@ object ORM {
    * Connection provider.
    * Can be overriden with `orm.connectionProvider` configuration parameter.
    */
-  val connectionProvider: ConnectionProvider = config.getString("orm.connectionProvider") match {
-    case Some(s: String) => Config.loadClass[ConnectionProvider](s).newInstance
-    case _ => DefaultConnectionProvider
+  lazy val connectionProvider: ConnectionProvider = config.getString("orm.connectionProvider") match {
+    case "" => DefaultConnectionProvider
+		case s => loadClass[ConnectionProvider](s).newInstance
   }
 
   /**
    * SQL dialect.
    * Can be overriden with `orm.dialect` configuration parameter.
    */
-  val dialect: Dialect = config.getString("orm.dialect") match {
-    case Some(s: String) => Config.loadClass[Dialect](s).newInstance
-    case _ => DefaultDialect
+  lazy val dialect: Dialect = config.getString("orm.dialect") match {
+    case "" => DefaultDialect
+    case s => loadClass[Dialect](s).newInstance
   }
 
   /**
    * SQL type converter.
    * Can be overriden with `orm.typeConverter` configuration parameter.
    */
-  val typeConverter: TypeConverter = config.getString("orm.typeConverter") match {
-    case Some(s: String) => Config.loadClass[TypeConverter](s).newInstance
-    case _ => DefaultTypeConverter
+  lazy val typeConverter: TypeConverter = config.getString("orm.typeConverter") match {
+    case "" => DefaultTypeConverter
+    case s => loadClass[TypeConverter](s).newInstance
   }
 
   /**
    * The schema name which is used if not specified explicitly.
    * Can be overriden with `orm.defaultSchema` configuration parameter.
    */
-  val defaultSchema = config.getString("orm.defaultSchema") match {
-    case Some(s: String) => new Schema(s)
-    case _ => new Schema("public")
-  }
+  lazy val defaultSchema = new Schema(config.getString("orm.defaultSchema"))
 
   /**
    * Transaction manager.
    * Can be overriden with `orm.transactionManager` configuration parameter.
    */
-  val transactionManager: TransactionManager = config.getString("orm.transactionManager") match {
-    case Some(s: String) => Config.loadClass[TransactionManager](s).newInstance
-    case _ => DefaultTransactionManager
+  lazy val transactionManager: TransactionManager = config.getString("orm.transactionManager") match {
+    case "" => DefaultTransactionManager
+    case s => loadClass[TransactionManager](s).newInstance
   }
 
   /**
@@ -82,7 +90,7 @@ object ORM {
   }
   def lastAlias(alias: String): Unit = _lastAlias.set(alias)
 
-  val avroDir = config.getString("orm.avro.dir", ".")
+  lazy val avroDir = config.getString("orm.avro.dir")
 }
 
 // ### Connection provider
@@ -125,16 +133,17 @@ trait ConnectionProvider {
  */
 object DefaultConnectionProvider extends ConnectionProvider {
   import ORM._
-  private val log = Logger.getLogger(getClass.getName)
+
+	private val log = getLogger(this)
   
-  private val autocommit: Boolean = config.getBool("orm.connection.autocommit", false)
+  private val autocommit = config.getBoolean("orm.connection.autocommit")
 
   private val isolation: Int = config.getString("orm.connection.isolation") match {
-    case Some("none") => Connection.TRANSACTION_NONE
-    case Some("read_uncommitted") => Connection.TRANSACTION_READ_UNCOMMITTED
-    case Some("read_committed") => Connection.TRANSACTION_READ_COMMITTED
-    case Some("repeatable_read") => Connection.TRANSACTION_REPEATABLE_READ
-    case Some("serializable") => Connection.TRANSACTION_SERIALIZABLE
+    case "none" => Connection.TRANSACTION_NONE
+    case "read_uncommitted" => Connection.TRANSACTION_READ_UNCOMMITTED
+    case "read_committed" => Connection.TRANSACTION_READ_COMMITTED
+    case "repeatable_read" => Connection.TRANSACTION_REPEATABLE_READ
+    case "serializable" => Connection.TRANSACTION_SERIALIZABLE
     case _ => 
       log.info("Using READ COMMITTED isolation, override 'orm.connection.isolation' if necesssary.")
       Connection.TRANSACTION_READ_COMMITTED
@@ -145,18 +154,13 @@ object DefaultConnectionProvider extends ConnectionProvider {
    * is specified or is constructed using c3p0 otherwise.
    */
   protected val ds: DataSource = config.getString("orm.connection.datasource") match {
-    case Some(jndiName) => 
-      val ctx = new InitialContext
-      val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
-      log.info("Using JNDI datasource: " + jndiName)
-      ds
-    case _ => 
+		case "" => 
       log.info("Using connection pooling.")
       
-      val driver = config.getString("orm.connection.driver") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.driver'.")}
-      val url = config.getString("orm.connection.url") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.url'.")}
-      val username = config.getString("orm.connection.username") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.username'.")}
-      val password = config.getString("orm.connection.password") getOrElse {throw ORMException("Missing mandatory configuration parameter 'orm.connection.password'.")}
+      val driver = config.getString("orm.connection.driver")
+      val url = config.getString("orm.connection.url")
+      val username = config.getString("orm.connection.username")
+      val password = config.getString("orm.connection.password")
       
       val p = new PoolProperties()
       // --- connection config
@@ -166,22 +170,22 @@ object DefaultConnectionProvider extends ConnectionProvider {
       p.setPassword(password)
 
       // --- pool size config
-      p.setInitialSize(config.getInt("orm.connection.initialPoolSize", 4))
-      p.setMinIdle(config.getInt("orm.connection.minPoolSize", 4))
-      p.setMaxActive(config.getInt("orm.connection.maxPoolSize", 100))
+      p.setInitialSize(config.getInt("orm.connection.initialPoolSize"))
+      p.setMinIdle(config.getInt("orm.connection.minPoolSize"))
+      p.setMaxActive(config.getInt("orm.connection.maxPoolSize"))
 
       // --- timeout config
-      p.setTimeBetweenEvictionRunsMillis(config.getInt("orm.connection.maxIdleTime", 3000) * 1000) // default 50 mins. After which an idle connection is removed from the pool.
+      p.setTimeBetweenEvictionRunsMillis(config.getInt("orm.connection.maxIdleTime") * 1000) // default 50 mins. After which an idle connection is removed from the pool.
       p.setRemoveAbandoned(true)
-      p.setRemoveAbandonedTimeout(config.getInt("orm.connection.abandonedTimeout", 6000)) // 100 mins, Timeout in seconds before an abandoned(in use) connection can be removed
+      p.setRemoveAbandonedTimeout(config.getInt("orm.connection.abandonedTimeout")) // 100 mins, Timeout in seconds before an abandoned(in use) connection can be removed
       p.setMinEvictableIdleTimeMillis(60000)
 
       // --- verifying config
-      p.setValidationQuery(config.getString("orm.connection.testQuery", "SELECT 1"))
-      p.setTestOnBorrow(config.getBool("orm.connection.testOnBorrow", true))
-      p.setTestOnReturn(config.getBool("orm.connection.testOnReturn", false))
-      p.setTestWhileIdle(config.getBool("orm.connection.testWhileIdle", true))
-      p.setValidationInterval(config.getInt("orm.connection.testPeriod", 30) * 1000) // milliseconds, default 30 seconds, must be less than maxIdleTime
+      p.setValidationQuery(config.getString("orm.connection.testQuery"))
+      p.setTestOnBorrow(config.getBoolean("orm.connection.testOnBorrow"))
+      p.setTestOnReturn(config.getBoolean("orm.connection.testOnReturn"))
+      p.setTestWhileIdle(config.getBoolean("orm.connection.testWhileIdle"))
+      p.setValidationInterval(config.getInt("orm.connection.testPeriod") * 1000) // milliseconds, default 30 seconds, must be less than maxIdleTime
 
       p.setLogAbandoned(false)
       
@@ -214,7 +218,12 @@ object DefaultConnectionProvider extends ConnectionProvider {
 //      ds.setTestConnectionOnCheckout(config.getBool("orm.connection.testConnectionOnCheckout", false))
 //        
 //      ds
-  }
+    case jndiName => 
+      val ctx = new InitialContext
+      val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
+      log.info("Using JNDI datasource: " + jndiName)
+      ds
+	}
 
   def dataSource: DataSource = ds
 

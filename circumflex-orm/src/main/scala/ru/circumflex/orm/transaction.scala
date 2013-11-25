@@ -2,8 +2,6 @@ package ru.circumflex.orm
 
 import java.sql.{Connection, SQLException}
 import collection.mutable.HashMap
-import java.util.logging.Level
-import java.util.logging.Logger
 
 // ## Transaction management
 
@@ -37,7 +35,7 @@ import java.util.logging.Logger
  * thread-locally current transaction.
  */
 trait TransactionManager {
-  private val log = Logger.getLogger(getClass.getName)
+	private val log = ORM.getLogger(this)
   
   private val threadLocalContext = new ThreadLocal[Transaction]
 
@@ -111,7 +109,7 @@ trait TransactionManager {
       block
       if (transaction.isLive) {
         transaction.commit
-        log.fine("Committed current transaction.")
+        log.debug("Committed current transaction.")
       }
     } catch {
       case e: Throwable =>
@@ -122,7 +120,7 @@ trait TransactionManager {
         throw e
     } finally if (transaction.isLive) {
       transaction.close
-      log.fine("Closed current connection.")
+      log.debug("Closed current connection.")
       setTransaction(prevTx)
     }
   }
@@ -138,19 +136,15 @@ object DefaultTransactionManager extends TransactionManager
  */
 @throws(classOf[SQLException])
 class Transaction {
-  private val log = Logger.getLogger(this.getClass.getName)
-  
+ 	 
   /**
    * Undelying JDBC connection.
    */
   private var _connection: Connection = _
+	@throws(classOf[Exception])
   private def connection = {
     if (_connection == null) {
-      try {
-        _connection = ORM.connectionProvider.openConnection
-      } catch {
-        case ex: Throwable => log.log(Level.SEVERE, ex.getMessage, ex); throw ex
-      }
+			_connection = ORM.connectionProvider.openConnection
     }
     _connection
   }

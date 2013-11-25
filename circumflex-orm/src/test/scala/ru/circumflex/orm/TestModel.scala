@@ -1,15 +1,18 @@
 package ru.circumflex.orm
 
+import akka.actor.ActorSystem
 import java.io.File
 import xml._
+import ru.circumflex.orm._
 
 
-object Model {
+object TestModel {
   private val USER_HOME = System.getProperty("user.home")
   private val DIR = new File(System.getProperty("test.dir", USER_HOME + "/tmp"))
   private val FILE = new File(DIR, "test.avro")
   private val syncInterval = 1024 * 100
 
+	ORM.actorSystem = ActorSystem()
 
   def main(args: Array[String]) {
     schema
@@ -18,6 +21,8 @@ object Model {
 
     testAvroWrite
     testAvroRead
+
+		System.exit(0)
   }
 
   def schema = {
@@ -117,7 +122,7 @@ class Country {
   override def toString = "Country(name=" + name + ", code=" + code + ")"
 }
 
-object Countries extends Table[Country] {
+object Countries extends Table[Country]("country_table") {
   val code = "code" VARCHAR(2) DEFAULT("'ch'")
   val name = "name" TEXT
   val capital = "capital_id".BIGINT REFERENCES(Capitals)

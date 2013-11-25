@@ -1,6 +1,5 @@
 package ru.circumflex.orm
 
-import java.util.logging.Logger
 
 // ## DDL stuff
 
@@ -9,7 +8,8 @@ import java.util.logging.Logger
  */
 class DDLUnit {
   import DDLUnit._
-  private val log = Logger.getLogger(getClass.getName)
+
+	private val log = ORM.getLogger(this)
 
   // ### Objects
 
