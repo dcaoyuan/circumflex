@@ -48,6 +48,11 @@
             <artifactId>avro</artifactId>
             <version>${avro.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.typesafe.akka</groupId>
+            <artifactId>akka-actor_${scala.version.major}</artifactId>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -123,13 +128,21 @@
                     <groupId>com.h2database</groupId>
                     <artifactId>h2</artifactId>
                     <version>${h2database.version}</version>
-                    <scope>test</scope>
+										<scope>test</scope>
                 </dependency>
             </dependencies>
         </profile>
     </profiles>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>**/*.conf</include>
+                </includes>
+            </resource>
+        </resources>
         <testResources>
             <testResource>
                 <directory>src/test/resources</directory>
