@@ -147,7 +147,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
   protected def query[A](postAction: ResultSet => A): A = {
     executeOnce{conn =>
       val sql = toSql
-      log.info(sql)
+      log.debug(sql)
 
       val st = conn.prepareStatement(sql)
       setParams(st, 1)
@@ -402,7 +402,7 @@ trait DMLQuery extends Query {
    */
   def execute(): Int = tx.execute{conn =>
     val sql = toSql
-    log.info(sql)
+    log.debug(sql)
     
     val st = conn.prepareStatement(sql)
     setParams(st, 1)

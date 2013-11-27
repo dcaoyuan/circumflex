@@ -435,7 +435,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
       tx.execute{conn =>
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(!_.null_?(record)) else fields
         val sql = ORM.dialect.insertRecord(this, fs)
-        log.info(sql)
+        log.debug(sql)
         
         val isAutoId = !fs.contains(PRIMARY_KEY)
         val st = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
@@ -489,7 +489,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
       tx.execute{conn =>
         val fs = if (isAutoId) this.fields.filter(_ != PRIMARY_KEY) else this.fields
         val sql = ORM.dialect.insertRecord(this, fs)
-        log.info(sql)
+        log.debug(sql)
         
         val st = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
         var i = 0
@@ -559,7 +559,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
         // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
         val fs = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
-        log.info(sql)
+        log.debug(sql)
         
         val st = conn.prepareStatement(sql) 
         setParams(record, st, fs)
@@ -597,7 +597,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
         // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
-        log.info(sql)
+        log.debug(sql)
         
         val st = conn.prepareStatement(sql)
         val paramIdx = fs.size + 1
@@ -645,7 +645,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
     else {
       tx.execute{conn =>
         val sql = ORM.dialect.deleteRecord(this)
-        log.info(sql)
+        log.debug(sql)
         
         val st = conn.prepareStatement(sql)
         ORM.typeConverter.write(st, idOf(record), 1)
@@ -706,7 +706,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
   def exists: Boolean = {
     executeOnce{conn =>
       val sql = "select * from " + qualifiedName + " where 1 = 0"
-      log.info(sql)
+      log.debug(sql)
 
       val ret = try {
         val st = conn.prepareStatement(sql)

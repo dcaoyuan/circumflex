@@ -98,7 +98,7 @@ class DDLUnit {
       if (o.isInstanceOf[Relation[_]]) o.asInstanceOf[Relation[_]].invalideCaches
 
       val sql = o.sqlDrop
-      log.info(sql)
+      log.debug(sql)
       
       tx.execute{conn =>
         val st = conn.prepareStatement(sql)
@@ -114,7 +114,7 @@ class DDLUnit {
   protected def createObjects(objects: Seq[SchemaObject]) =
     for (o <- objects) {
       val sql = o.sqlCreate
-      log.info(sql)
+      log.debug(sql)
 
       tx.execute{conn =>
         val st = conn.prepareStatement(sql)
