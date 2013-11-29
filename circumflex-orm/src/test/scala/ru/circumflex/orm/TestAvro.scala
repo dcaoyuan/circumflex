@@ -12,7 +12,7 @@ import ru.circumflex.orm.sql.SimpleResultSet
 object TestAvro {
   private val USER_HOME = System.getProperty("user.home")
   private val DIR = new File(System.getProperty("test.dir", USER_HOME + "/tmp"))
-	ORM.actorSystem = ActorSystem()
+  ORM.actorSystem = ActorSystem()
 
   def main(args: Array[String]) {
     write

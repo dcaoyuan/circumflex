@@ -19,13 +19,13 @@ object ORM {
 
   val config = ConfigFactory.load()
 
-	/**
-	 * You should assign an actorSystem as soon as possible
-	 */
-	var actorSystem: ActorSystem = _
-	def getLogger(o: AnyRef) = Logging.getLogger(actorSystem, o)
+  /**
+   * You should assign an actorSystem as soon as possible
+   */
+  var actorSystem: ActorSystem = _
+  def getLogger(o: AnyRef) = Logging.getLogger(actorSystem, o)
 
-	def classLoader: ClassLoader = Thread.currentThread.getContextClassLoader
+  def classLoader: ClassLoader = Thread.currentThread.getContextClassLoader
 
   def loadClass[C](name: String): Class[C] = Class.forName(name, true, classLoader).asInstanceOf[Class[C]]
 
@@ -37,7 +37,7 @@ object ORM {
    */
   lazy val connectionProvider: ConnectionProvider = config.getString("orm.connectionProvider") match {
     case "" => DefaultConnectionProvider
-		case s => loadClass[ConnectionProvider](s).newInstance
+    case s => loadClass[ConnectionProvider](s).newInstance
   }
 
   /**
@@ -134,7 +134,7 @@ trait ConnectionProvider {
 object DefaultConnectionProvider extends ConnectionProvider {
   import ORM._
 
-	private val log = getLogger(this)
+  private val log = getLogger(this)
   
   private val autocommit = config.getBoolean("orm.connection.autocommit")
 
@@ -154,7 +154,7 @@ object DefaultConnectionProvider extends ConnectionProvider {
    * is specified or is constructed using c3p0 otherwise.
    */
   protected val ds: DataSource = config.getString("orm.connection.datasource") match {
-		case "" => 
+    case "" => 
       log.info("Using connection pooling.")
       
       val driver = config.getString("orm.connection.driver")
@@ -223,7 +223,7 @@ object DefaultConnectionProvider extends ConnectionProvider {
       val ds = ctx.lookup(jndiName).asInstanceOf[DataSource]
       log.info("Using JNDI datasource: " + jndiName)
       ds
-	}
+  }
 
   def dataSource: DataSource = ds
 

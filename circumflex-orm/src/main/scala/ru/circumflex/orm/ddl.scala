@@ -9,7 +9,7 @@ package ru.circumflex.orm
 class DDLUnit {
   import DDLUnit._
 
-	private val log = ORM.getLogger(this)
+  private val log = ORM.getLogger(this)
 
   // ### Objects
 

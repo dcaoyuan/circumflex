@@ -35,7 +35,7 @@ import collection.mutable.HashMap
  * thread-locally current transaction.
  */
 trait TransactionManager {
-	private val log = ORM.getLogger(this)
+  private val log = ORM.getLogger(this)
   
   private val threadLocalContext = new ThreadLocal[Transaction]
 
@@ -136,15 +136,15 @@ object DefaultTransactionManager extends TransactionManager
  */
 @throws(classOf[SQLException])
 class Transaction {
- 	 
+    
   /**
    * Undelying JDBC connection.
    */
   private var _connection: Connection = _
-	@throws(classOf[Exception])
+  @throws(classOf[Exception])
   private def connection = {
     if (_connection == null) {
-			_connection = ORM.connectionProvider.openConnection
+      _connection = ORM.connectionProvider.openConnection
     }
     _connection
   }

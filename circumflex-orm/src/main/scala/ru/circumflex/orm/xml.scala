@@ -28,7 +28,7 @@ class Deployment(val id: String,
                  val onExist: Deployment.OnExistAction,
                  val entries: Seq[Node]
 ) {
-	private val log = ORM.getLogger(this)  
+  private val log = ORM.getLogger(this)  
 
   def process(): Unit = try {
     entries.foreach(e => processNode(e, Nil))

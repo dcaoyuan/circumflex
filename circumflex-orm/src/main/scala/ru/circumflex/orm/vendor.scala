@@ -5,8 +5,8 @@ class PostgreSQLDialect extends Dialect {
 }
 
 class MySQLDialect extends Dialect {
-	private val log = ORM.getLogger(this)
-	
+  private val log = ORM.getLogger(this)
+  
   override def textType = "VARCHAR(4096)"
   override def timestampType = "TIMESTAMP"
   override def supportsSchema_?(): Boolean = false

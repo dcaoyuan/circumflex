@@ -12,7 +12,7 @@ object TestModel {
   private val FILE = new File(DIR, "test.avro")
   private val syncInterval = 1024 * 100
 
-	ORM.actorSystem = ActorSystem()
+  ORM.actorSystem = ActorSystem()
 
   def main(args: Array[String]) {
     schema
@@ -22,7 +22,7 @@ object TestModel {
     testAvroWrite
     testAvroRead
 
-		System.exit(0)
+    System.exit(0)
   }
 
   def schema = {

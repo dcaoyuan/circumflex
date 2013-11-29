@@ -12,8 +12,8 @@ class Messages(val baseName: String, val locale: Locale) extends HashModel[Strin
   } catch {
     case e: Throwable => {
         log.warning("ResourceBundle for messages instance not found: " + baseName)
-				null
-			}
+        null
+      }
   }
   def get(key: String): Option[String] = try {
     Option(msgBundle.getString(key))
@@ -23,8 +23,8 @@ class Messages(val baseName: String, val locale: Locale) extends HashModel[Strin
   def get(key: String, params: Pair[String, String]*): Option[String] = get(key, Map(params: _*))
   def get(key: String, params: Map[String, String]): Option[String] =
     get(key).map(m => params.foldLeft(m) {
-				case (m, (name, value)) => m.replaceAll("\\{" + name + "\\}", value)
-			})
+        case (m, (name, value)) => m.replaceAll("\\{" + name + "\\}", value)
+      })
   override def apply(key: String): String = get(key) match {
     case Some(v) => v
     case _ =>
