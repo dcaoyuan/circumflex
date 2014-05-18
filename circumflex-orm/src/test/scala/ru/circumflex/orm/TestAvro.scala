@@ -1,18 +1,15 @@
 package ru.circumflex.orm
 
 
-import akka.actor.ActorSystem
 import java.io.File
 import java.sql.SQLException
 import java.sql.Types
-import ru.circumflex.orm._
 import ru.circumflex.orm.avro.Avro
 import ru.circumflex.orm.sql.SimpleResultSet
 
 object TestAvro {
   private val USER_HOME = System.getProperty("user.home")
   private val DIR = new File(System.getProperty("test.dir", USER_HOME + "/tmp"))
-  ORM.actorSystem = ActorSystem()
 
   def main(args: Array[String]) {
     write

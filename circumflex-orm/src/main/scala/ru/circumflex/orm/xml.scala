@@ -1,6 +1,7 @@
 package ru.circumflex.orm
 
 import java.io.File
+import java.util.logging.Logger
 import xml._
 
 /*!# XML (de)serialization
@@ -28,7 +29,7 @@ class Deployment(val id: String,
                  val onExist: Deployment.OnExistAction,
                  val entries: Seq[Node]
 ) {
-  private val log = ORM.getLogger(this)  
+  private val log = Logger.getLogger(getClass.getName)
 
   def process(): Unit = try {
     entries.foreach(e => processNode(e, Nil))

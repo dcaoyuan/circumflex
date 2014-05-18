@@ -4,6 +4,7 @@ import java.sql.ResultSet
 import java.sql.PreparedStatement
 import collection.mutable.ListBuffer
 import java.sql.SQLException
+import java.util.logging.Logger
 import ru.circumflex.orm.avro.Avro
 import ru.circumflex.orm.avro.AvroNode
 
@@ -13,7 +14,8 @@ import ru.circumflex.orm.avro.AvroNode
  * The most common contract for queries.
  */
 trait Query extends SQLable with ParameterizedExpression with Cloneable {
-
+  protected val log = Logger.getLogger(this.getClass.getName)
+  
   protected var aliasCounter = 0
 
   /**
@@ -81,7 +83,6 @@ trait Query extends SQLable with ParameterizedExpression with Cloneable {
  * will be rendered in `SELECT` clause and will be used to read `ResultSet`.
  */
 abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
-  private val log = ORM.getLogger(this)
 
   ensureProjectionAlias(projection)
 
@@ -147,7 +148,7 @@ abstract class SQLQuery[T](val projection: Projection[T]) extends Query {
   protected def query[A](postAction: ResultSet => A): A = {
     executeOnce{conn =>
       val sql = toSql
-      log.debug(sql)
+      log.info(sql)
 
       val st = conn.prepareStatement(sql)
       setParams(st, 1)
@@ -395,14 +396,13 @@ class Select[T]($projection: Projection[T]) extends SQLQuery[T]($projection) {
  * A conrtact for DML queries (data-manipulation).
  */
 trait DMLQuery extends Query {
-  private val log = ORM.getLogger(this)  
 
   /**
    * Execute a query and return the number of affected rows.
    */
   def execute(): Int = tx.execute{conn =>
     val sql = toSql
-    log.debug(sql)
+    log.info(sql)
     
     val st = conn.prepareStatement(sql)
     setParams(st, 1)
@@ -428,83 +428,83 @@ class NativeDMLQuery(expression: ParameterizedExpression) extends DMLQuery {
  *
  * The projections of `query` must match the columns of target `relation`.
  */
-class InsertSelect[R](val relation: Relation[R], val query: SQLQuery[_]) extends DMLQuery {
-  if (relation.readOnly_?)
-    throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
-  def parameters = query.parameters
-  def toSql: String = ORM.dialect.insertSelect(this)
-}
+ class InsertSelect[R](val relation: Relation[R], val query: SQLQuery[_]) extends DMLQuery {
+    if (relation.readOnly_?)
+      throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
+    def parameters = query.parameters
+    def toSql: String = ORM.dialect.insertSelect(this)
+  }
 
-/**
- * A lil helper to keep stuff DSL'ly.
- */
-class InsertSelectHelper[R](val relation: Relation[R]) {
-  def SELECT[T](projection: Projection[T]) = new InsertSelect(relation, new Select(projection))
-}
+ /**
+  * A lil helper to keep stuff DSL'ly.
+  */
+ class InsertSelectHelper[R](val relation: Relation[R]) {
+    def SELECT[T](projection: Projection[T]) = new InsertSelect(relation, new Select(projection))
+  }
 
 // ## DELETE query
 
-/**
- * Functionality for DELETE query.
- */
-class Delete[R](val node: RelationNode[R]) extends DMLQuery {
-  val relation = node.relation
-  if (relation.readOnly_?)
-    throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
+ /**
+  * Functionality for DELETE query.
+  */
+ class Delete[R](val node: RelationNode[R]) extends DMLQuery {
+    val relation = node.relation
+    if (relation.readOnly_?)
+      throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
 
-  // ### WHERE clause
+    // ### WHERE clause
 
-  protected var _where: Predicate = EmptyPredicate
-  def where: Predicate = this._where
-  def WHERE(predicate: Predicate): Delete[R] = {
-    this._where = predicate
-    this
+    protected var _where: Predicate = EmptyPredicate
+    def where: Predicate = this._where
+    def WHERE(predicate: Predicate): Delete[R] = {
+      this._where = predicate
+      this
+    }
+
+    // ### Miscellaneous
+    def parameters = _where.parameters
+    def toSql: String = ORM.dialect.delete(this)
   }
-
-  // ### Miscellaneous
-  def parameters = _where.parameters
-  def toSql: String = ORM.dialect.delete(this)
-}
 
 // ## UPDATE query
 
-/**
- * Functionality for UPDATE query.
- */
-class Update[R](val node: RelationNode[R]) extends DMLQuery {
-  val relation = node.relation
-  if (relation.readOnly_?)
-    throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
+ /**
+  * Functionality for UPDATE query.
+  */
+ class Update[R](val node: RelationNode[R]) extends DMLQuery {
+    val relation = node.relation
+    if (relation.readOnly_?)
+      throw new ORMException("The relation " + relation.qualifiedName + " is read-only.")
 
-  // ### SET clause
+    // ### SET clause
 
-  private var _setClause: Seq[Pair[Field[R, _], Any]] = Nil
-  def setClause = _setClause
-  def SET[T](field: Field[R, _], value: Any): Update[R] = {
-    _setClause ++= List(field -> value)
-    this
+    private var _setClause: Seq[Pair[Field[R, _], Any]] = Nil
+    def setClause = _setClause
+    def SET[T](field: Field[R, _], value: Any): Update[R] = {
+      _setClause ++= List(field -> value)
+      this
+    }
+    def SET[F](association: Association[R, F], value: F): Update[R] =
+      SET(association.field, association.foreignRelation.idOf(value))
+    def SET_NULL[T](field: Field[R, _]): Update[R] = set(field, null.asInstanceOf[T])
+    def SET_NULL[P](association: Association[R, P]): Update[R] =
+      SET_NULL(association.field)
+
+    // ### WHERE clause
+
+    protected var _where: Predicate = EmptyPredicate
+    def where: Predicate = _where
+    def WHERE(predicate: Predicate): Update[R] = {
+      this._where = predicate
+      this
+    }
+
+    // ### Miscellaneous
+
+    def parameters = _setClause.map(_._2) ++ _where.parameters
+    def toSql: String = ORM.dialect.update(this)
+
   }
-  def SET[F](association: Association[R, F], value: F): Update[R] =
-    SET(association.field, association.foreignRelation.idOf(value))
-  def SET_NULL[T](field: Field[R, _]): Update[R] = set(field, null.asInstanceOf[T])
-  def SET_NULL[P](association: Association[R, P]): Update[R] =
-    SET_NULL(association.field)
-
-  // ### WHERE clause
-
-  protected var _where: Predicate = EmptyPredicate
-  def where: Predicate = _where
-  def WHERE(predicate: Predicate): Update[R] = {
-    this._where = predicate
-    this
-  }
-
-  // ### Miscellaneous
-
-  def parameters = _setClause.map(_._2) ++ _where.parameters
-  def toSql: String = ORM.dialect.update(this)
-
-}
 
 
 

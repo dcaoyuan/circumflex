@@ -1,6 +1,7 @@
 package ru.circumflex.orm
 
 import java.sql.ResultSet
+import java.util.logging.Logger
 
 // ## Projection Basics
 
@@ -113,7 +114,7 @@ class FieldProjection[R, T](val node: RelationNode[R], val field: Field[R, T]) e
  * A projection for reading entire `Record`.
  */
 class RecordProjection[R](val node: RelationNode[R]) extends CompositeProjection[R] {
-  private val log = ORM.getLogger(this)
+  private val log = Logger.getLogger(this.getClass.getName)
   
   private type FP = FieldProjection[R, _]
 

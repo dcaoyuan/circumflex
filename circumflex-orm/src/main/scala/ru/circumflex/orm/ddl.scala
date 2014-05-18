@@ -1,5 +1,6 @@
 package ru.circumflex.orm
 
+import java.util.logging.Logger
 
 // ## DDL stuff
 
@@ -8,8 +9,7 @@ package ru.circumflex.orm
  */
 class DDLUnit {
   import DDLUnit._
-
-  private val log = ORM.getLogger(this)
+  private val log = Logger.getLogger(getClass.getName)
 
   // ### Objects
 
@@ -98,7 +98,7 @@ class DDLUnit {
       if (o.isInstanceOf[Relation[_]]) o.asInstanceOf[Relation[_]].invalideCaches
 
       val sql = o.sqlDrop
-      log.debug(sql)
+      log.info(sql)
       
       tx.execute{conn =>
         val st = conn.prepareStatement(sql)
@@ -114,7 +114,7 @@ class DDLUnit {
   protected def createObjects(objects: Seq[SchemaObject]) =
     for (o <- objects) {
       val sql = o.sqlCreate
-      log.debug(sql)
+      log.info(sql)
 
       tx.execute{conn =>
         val st = conn.prepareStatement(sql)

@@ -1,11 +1,13 @@
 package ru.circumflex.orm
 
 import java.sql.Statement
+import java.util.logging.Logger
+import org.aiotrade.lib.collection.WeakIdentityBiHashMap
+import org.aiotrade.lib.util.ClassVar
+import org.aiotrade.lib.util.config.Config
 import java.lang.reflect.Method
 import java.sql.PreparedStatement
 import java.sql.SQLException
-import org.aiotrade.lib.collection.WeakIdentityBiHashMap
-import org.aiotrade.lib.util.ClassVar
 import scala.collection.mutable
 import scala.reflect._
 
@@ -24,7 +26,7 @@ object RelationRegistry {
     classToRelation.get(r.asInstanceOf[AnyRef].getClass) match {
       case Some(rel: Relation[R]) => rel
       case _ => 
-        val relClass = ORM.loadClass[Relation[R]](r.asInstanceOf[AnyRef].getClass.getName + "$")
+        val relClass = Config.loadClass[Relation[R]](r.asInstanceOf[AnyRef].getClass.getName + "$")
         val relation = relClass.getField("MODULE$").get(null).asInstanceOf[Relation[R]]
         classToRelation += (r.asInstanceOf[AnyRef].getClass -> relation)
         relation
@@ -35,7 +37,7 @@ object RelationRegistry {
 // ## Relation
 
 abstract class Relation[R : ClassTag](_relationName: String = null) {
-  private lazy val log = ORM.getLogger(this)
+  private val log = Logger.getLogger(this.getClass.getName)
   
   protected var _initialized = false
   
@@ -57,7 +59,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
    * e.g. strip trailing `$` from `this.getClass.getName`.
    * getClass.getName.replaceAll("\\$(?=\\Z)", "")
    */
-  val recordClass: Class[R] = ORM.loadClass[R](classTag[R].runtimeClass.getName)
+  val recordClass: Class[R] = Config.loadClass[R](classTag[R].runtimeClass.getName)
 
   private val recordSample: R = recordClass.newInstance
   private val recordFields: List[ClassVar[R, _]] = ClassVar.getPublicVars(recordClass)
@@ -435,7 +437,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
       tx.execute{conn =>
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(!_.null_?(record)) else fields
         val sql = ORM.dialect.insertRecord(this, fs)
-        log.debug(sql)
+        log.info(sql)
         
         val isAutoId = !fs.contains(PRIMARY_KEY)
         val st = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
@@ -489,7 +491,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
       tx.execute{conn =>
         val fs = if (isAutoId) this.fields.filter(_ != PRIMARY_KEY) else this.fields
         val sql = ORM.dialect.insertRecord(this, fs)
-        log.debug(sql)
+        log.info(sql)
         
         val st = if (isAutoId) conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS) else conn.prepareStatement(sql)
         var i = 0
@@ -559,7 +561,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
         // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
         val fs = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
-        log.debug(sql)
+        log.info(sql)
         
         val st = conn.prepareStatement(sql) 
         setParams(record, st, fs)
@@ -597,7 +599,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
         // @Note: since it's an update command, do not neet to care about PRIMARY_KEY field
         val fs: Seq[Field[R, _]] = if (fields.isEmpty) this.fields.filter(_ != PRIMARY_KEY) else fields
         val sql = ORM.dialect.updateRecord(this, fs)
-        log.debug(sql)
+        log.info(sql)
         
         val st = conn.prepareStatement(sql)
         val paramIdx = fs.size + 1
@@ -645,7 +647,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
     else {
       tx.execute{conn =>
         val sql = ORM.dialect.deleteRecord(this)
-        log.debug(sql)
+        log.info(sql)
         
         val st = conn.prepareStatement(sql)
         ORM.typeConverter.write(st, idOf(record), 1)
@@ -706,7 +708,7 @@ abstract class Relation[R : ClassTag](_relationName: String = null) {
   def exists: Boolean = {
     executeOnce{conn =>
       val sql = "select * from " + qualifiedName + " where 1 = 0"
-      log.debug(sql)
+      log.info(sql)
 
       val ret = try {
         val st = conn.prepareStatement(sql)
